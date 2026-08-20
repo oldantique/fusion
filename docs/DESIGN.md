@@ -73,3 +73,14 @@ results. Turns left "running" by a crash are marked failed at next start.
 Python because the whole system is subprocess + NDJSON + SSE plumbing where Node is native.
 
 **Conventions.** English everywhere on disk; Chinese in conversation with the owner.
+
+## 2026-08-20 — Synthesizer stays stateless (no `claude --resume`)
+
+Considered resuming the Claude CLI session across turns instead of replaying history.
+Rejected for v1: a resumed session carries every earlier turn's raw candidates, which breaks
+the "only fused answers are replayed" rule; the per-turn letter shuffle makes cross-turn memory
+actively misleading; context grows by four candidates plus an analysis per turn instead of one
+question/answer pair; a fallback synthesizer would leave the session one turn behind; and the
+prompt-cache win is small because turns are minutes apart. Revisit only as an experiment
+behind a flag with a per-conversation letter mapping — see `docs/THREADS.md`. The general cure
+for long histories is summarization, which helps all lanes.

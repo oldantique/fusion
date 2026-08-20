@@ -12,6 +12,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 5 | codex via `app-server` daemon (token streaming, no cold start) | OPEN | Experimental API; unverified |
 | 6 | Raise codex concurrency after plan upgrade | BLOCKED-by-owner | Config only (`CODEX_MAX_CONCURRENCY`) |
 | 8 | Stream raw lane answers (claude/grok can) | ON-HOLD | Deliberately skipped in v1 |
+| 9 | Synthesizer via `claude --resume` (session memory) | ON-HOLD | v2 experiment only, behind a flag, with per-conversation letter mapping; rationale in `docs/DESIGN.md` |
 
 ## Archive
 
