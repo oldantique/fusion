@@ -25,12 +25,13 @@ CREATE TABLE IF NOT EXISTS turns (
   synth_ms INTEGER,
   providers_json TEXT NOT NULL,
   history_omitted INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL,            -- running | done | failed
+  status TEXT NOT NULL,            -- running | done | failed | cancelled
   error TEXT,
   created_at INTEGER NOT NULL,
   finished_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS turns_conv ON turns(conversation_id, idx);
+CREATE UNIQUE INDEX IF NOT EXISTS turns_conv_unique ON turns(conversation_id, idx);
 CREATE TABLE IF NOT EXISTS lane_results (
   turn_id TEXT NOT NULL REFERENCES turns(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
@@ -62,9 +63,11 @@ export interface TurnRow {
   letter_map: Record<string, ProviderId> | null;
   synth_provider: ProviderId | null;
   synth_ms: number | null;
+  /** Set when `answer` is one lane's raw answer (single lane, or synthesis failed) rather than a synthesis. */
+  answer_provider: ProviderId | null;
   providers: ProviderId[];
   history_omitted: number;
-  status: "running" | "done" | "failed";
+  status: "running" | "done" | "failed" | "cancelled";
   error: string | null;
   created_at: number;
   finished_at: number | null;
@@ -83,6 +86,15 @@ export class Store {
     this.db = new DatabaseSync(file);
     this.db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;");
     this.db.exec(SCHEMA);
+    // Additive columns for databases created before they existed (no migration framework yet;
+    // each line is idempotent because SQLite rejects a duplicate column).
+    for (const ddl of ["ALTER TABLE turns ADD COLUMN answer_provider TEXT"]) {
+      try {
+        this.db.exec(ddl);
+      } catch (e) {
+        if (!/duplicate column/i.test(String(e))) throw e;
+      }
+    }
   }
 
   close() {
@@ -156,10 +168,18 @@ export class Store {
       .run(turnId, lane.provider, lane.status, lane.answer, lane.ms, lane.error, lane.attempts, lane.usage ? JSON.stringify(lane.usage) : null);
   }
 
-  finishTurn(turnId: string, answer: string | null, synthesis: SynthesisResult | null, historyOmitted: number, error: string | null) {
+  finishTurn(
+    turnId: string,
+    answer: string | null,
+    synthesis: SynthesisResult | null,
+    historyOmitted: number,
+    error: string | null,
+    answerProvider: ProviderId | null = null,
+  ) {
+    const status = answer ? "done" : error === "cancelled" ? "cancelled" : "failed";
     this.db
       .prepare(
-        `UPDATE turns SET answer = ?, analysis_json = ?, letter_map_json = ?, synth_provider = ?, synth_ms = ?,
+        `UPDATE turns SET answer = ?, analysis_json = ?, letter_map_json = ?, synth_provider = ?, synth_ms = ?, answer_provider = ?,
            history_omitted = ?, status = ?, error = ?, finished_at = ? WHERE id = ?`,
       )
       .run(
@@ -168,8 +188,9 @@ export class Store {
         synthesis ? JSON.stringify(synthesis.letterMap) : null,
         synthesis?.provider ?? null,
         synthesis?.ms ?? null,
+        answerProvider,
         historyOmitted,
-        answer ? "done" : "failed",
+        status,
         error,
         Date.now(),
         turnId,
@@ -214,6 +235,7 @@ export class Store {
       letter_map: r.letter_map_json ? JSON.parse(r.letter_map_json) : null,
       synth_provider: r.synth_provider,
       synth_ms: r.synth_ms,
+      answer_provider: r.answer_provider ?? null,
       providers: JSON.parse(r.providers_json),
       history_omitted: r.history_omitted,
       status: r.status,

@@ -7,7 +7,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
 import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
 import { Store } from "../store/db.ts";
-import { Jobs } from "./jobs.ts";
+import { Jobs, ConflictError } from "./jobs.ts";
 import { ALL_PROVIDERS, PROVIDER_LABELS, type ProviderId } from "../types.ts";
 import { providers } from "../providers/index.ts";
 import { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } from "./auth.ts";
@@ -78,7 +78,10 @@ app.patch("/api/conversations/:id", async (c) => {
   return c.json({ ok: true });
 });
 app.delete("/api/conversations/:id", (c) => {
-  store.deleteConversation(c.req.param("id"));
+  const id = c.req.param("id");
+  const active = jobs.activeFor(id);
+  if (active) return c.json({ error: "turn in progress — stop it first", turnId: active }, 409);
+  store.deleteConversation(id);
   return c.json({ ok: true });
 });
 
@@ -93,9 +96,15 @@ app.post("/api/conversations/:id/ask", async (c) => {
     (ALL_PROVIDERS as readonly string[]).includes(p as string),
   );
   if (ids.length === 0) return c.json({ error: "select at least one provider" }, 400);
+  if (jobs.activeFor(conv.id)) return c.json({ error: "turn in progress", turnId: jobs.activeFor(conv.id) }, 409);
   if (conv.turn_count === 0 && conv.title === "New conversation") store.renameConversation(conv.id, question.slice(0, 80));
-  const turnId = jobs.start(conv.id, question, ids);
-  return c.json({ turnId }, 202);
+  try {
+    const turnId = jobs.start(conv.id, question, ids);
+    return c.json({ turnId }, 202);
+  } catch (e) {
+    if (e instanceof ConflictError) return c.json({ error: "turn in progress", turnId: e.turnId }, 409);
+    throw e;
+  }
 });
 
 app.get("/api/turns/:id", (c) => {
@@ -110,15 +119,24 @@ app.get("/api/turns/:id/events", (c) => {
   const turnId = c.req.param("id");
   const turn = store.getTurn(turnId);
   if (!turn) return c.json({ error: "not found" }, 404);
+  // EventSource sends Last-Event-ID on reconnect; replay resumes after it instead of from scratch.
+  const afterSeq = Number.parseInt(c.req.header("last-event-id") ?? "0", 10) || 0;
   return streamSSE(c, async (stream) => {
-    let done = false;
-    const finish = () => {
-      done = true;
+    let finish!: () => void;
+    const finished = new Promise<void>((r) => (finish = r));
+    // Writes are serialized and a failed write ends the stream, instead of fire-and-forget.
+    let chain = Promise.resolve();
+    const write = (msg: { event: string; data: string; id?: string }) => {
+      chain = chain.then(() => stream.writeSSE(msg)).catch(() => finish());
     };
-    const unsubscribe = jobs.subscribe(turnId, (ev) => {
-      void stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
-      if (ev.type === "finished" || ev.type === "fatal") finish();
-    });
+    const unsubscribe = jobs.subscribe(
+      turnId,
+      ({ seq, ev }) => {
+        write({ id: String(seq), event: ev.type, data: JSON.stringify(ev) });
+        if (ev.type === "finished" || ev.type === "fatal") finish();
+      },
+      afterSeq,
+    );
     if (unsubscribe === null) {
       // Job already evicted from memory: send the persisted final state.
       await stream.writeSSE({ event: "finished", data: JSON.stringify({ type: "finished", answer: turn.answer, persisted: true }) });
@@ -128,11 +146,11 @@ app.get("/api/turns/:id/events", (c) => {
       unsubscribe();
       finish();
     });
-    while (!done) {
-      await stream.sleep(15_000);
-      if (!done) await stream.writeSSE({ event: "ping", data: "" });
-    }
+    const ping = setInterval(() => write({ event: "ping", data: "" }), 15_000);
+    await finished;
+    clearInterval(ping);
     unsubscribe();
+    await chain; // flush the terminal event before closing
   });
 });
 
@@ -143,11 +161,18 @@ const server = serve({ fetch: app.fetch, hostname: config.host, port: config.por
   console.log(`fusion listening on http://${info.address}:${info.port}`);
 });
 
+let shuttingDown = false;
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.on(sig, () => {
+  process.on(sig, async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`${sig}: shutting down`);
-    jobs.abortAll();
     server.close();
+    jobs.abortAll();
+    // Let aborted lanes kill their children and record 'cancelled' before the process goes away;
+    // failStaleTurns() on the next start covers anything that did not make it.
+    const clean = await jobs.drain(5_000);
+    if (!clean) console.warn("shutdown: some turns did not finish within the grace period");
     store.close();
     process.exit(0);
   });
