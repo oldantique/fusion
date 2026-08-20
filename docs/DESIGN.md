@@ -1,134 +1,75 @@
-# Fusion — Design
+# Fusion — Design decisions
 
-Self-hosted "OpenRouter Fusion": one question fans out in parallel to four locally installed,
-subscription-authenticated AI CLIs; a synthesizer merges the answers into a single markdown
-response, shown in a local web UI with the raw answers available underneath.
+Dated, append-only record of *why* things are the way they are. Current behaviour is defined by
+the code (see the "where facts live" table in `CLAUDE.md`); if this file and the code disagree,
+the code is current and this file needs a new dated entry, not a silent edit. Open and deferred
+work is tracked in `THREADS.md`, not here.
 
-Decisions below were settled in the 2026-08-20 design interview. Items marked *(v2)* are
-explicitly deferred.
+## 2026-08-20 — Initial design (settled in a design interview with the owner)
 
-## 1. Scope
+**Product.** Self-hosted "OpenRouter Fusion": one question fans out in parallel to the
+subscription-authenticated CLIs installed on this machine; a synthesizer merges the answers into
+one Markdown response shown in a local web UI, with the raw answers available underneath.
+Prior art (karpathy/llm-council and similar) is API-key based; the subscription-CLI + web-UI
+combination was an empty niche.
 
-| Area | v1 | v2 |
-|---|---|---|
-| Conversation | Multi-turn, stateless replay (§4) | History summarization |
-| Panel models | claude opus · gpt-5.6-sol · kimi k3 · grok-4.6, all at effort `high`, per-question checkboxes (≥1) | — |
-| Synthesizer | Fixed: Claude Opus, effort high | Selectable synthesizer |
-| Tools for models | All disabled | "Allow web search" toggle |
-| UI | Final answer (streamed) on top; four raw answers collapsed below with status/latency; history sidebar | Per-lane retry button |
-| Access | `0.0.0.0`, shared-password login → httpOnly cookie | — |
-| Persistence | SQLite (`node:sqlite`, Node 22.23) in `data/` | — |
-| Service | Manual `npm start`; systemd user unit provided | — |
+**Sources.** claude (Opus), codex (GPT-5.6 Sol), kimi (K3), grok (4.6), all at effort "high";
+DeepSeek deliberately excluded. Every lane is a subprocess of the vendor CLI, using whatever
+login the CLI already has — no API keys. Claude uses `claude -p` rather than the Agent SDK:
+the SDK spawns the same binary with the same auth path and would only add a second code path.
 
-## 2. Stack
+**Tools off.** Models answer from their own knowledge; no file, shell or web access. Reasons:
+safety (kimi has no permission gate), speed, and prompt-cache friendliness. A web-search toggle
+is deferred (THREADS).
 
-Node 22 / TypeScript, single process. Hono for HTTP + SSE. Plain static frontend (no framework):
-`marked` + `highlight.js` + DOMPurify for markdown rendering. No external network calls from the
-server except spawning the CLIs.
+**Sandbox + env hygiene.** CLIs are spawned from an empty directory with parent-session env
+vars scrubbed, because several CLIs read the cwd's agent files into their system prompt and a
+parent Claude Code session leaks variables that alter child behaviour.
 
-## 3. Providers
+**Parsers.** Two families: an Anthropic-Messages stream parser (claude and grok, whose streams
+are wire-compatible) and a whole-message parser (codex and kimi, which emit no token deltas).
+Parsers are tested against captured real output in `fixtures/`.
 
-Every provider is a subprocess spawned from an **empty sandbox dir** (`data/sandbox/`) so no
-CLAUDE.md / AGENTS.md / skills leak into system prompts. Each call is bounded by a 300 s timeout,
-retried once on empty output or non-zero exit, then marked `failed` and excluded from synthesis.
+**Synthesis.** Fixed synthesizer: Claude Opus via `--json-schema`, one call producing both the
+final Markdown answer (streamed to the UI via a partial-JSON field streamer) and a structured
+analysis — consensus, contradictions, unique insights, gaps — modelled on OpenRouter Fusion's
+two-layer design but collapsed into a single call to save a cold start. Candidates are shown to
+the synthesizer as anonymized letters in an order derived from the question, to limit
+self-preference (the synthesizer is also a panelist); names are revealed only in the UI.
+If Claude fails, the next available provider synthesizes answer-only. With a single lane
+selected, synthesis is skipped.
 
-Two parser families:
+**Multi-turn = stateless replay.** No CLI sessions. Each turn replays prior (question, *fused*
+answer) pairs as a preamble for every lane and the synthesizer, so all models see identical
+context; raw lane answers are never replayed. History is trimmed from the oldest turn beyond a
+character budget (config) and the UI says how many turns were omitted. Rejected alternative:
+native per-CLI sessions — each model would only remember its own answer, codex's resume drops
+model/effort, and four session ids would need managing.
 
-- **Anthropic-Messages stream parser** — claude and grok (grok's `streaming-messages-json` is
-  wire-compatible). Emits `text_delta`, completion = `type=="result" && !is_error`.
-- **Whole-message parser** — codex (`item.completed` → `agent_message.text`) and kimi
-  (`role=="assistant"` line). No deltas; UI shows a spinner until the block lands.
+**Failure policy.** Per-lane timeout (config), one retry, then the lane is marked failed and
+excluded from synthesis; the turn still completes with the remaining lanes.
 
-Verified invocations (from the research probe; fixtures in `fixtures/`):
+**Concurrency.** Per-provider semaphores. Codex defaults to one at a time because OpenAI's
+own guidance asks that a single `auth.json` not be shared across concurrent jobs; the owner can
+raise it (config) after upgrading the plan.
 
-```bash
-# claude (panel + synthesizer). NEVER --bare (kills OAuth).
-claude -p "$PROMPT" --model opus --effort high --tools "" \
-  --system-prompt "$SYS" --setting-sources "" --disable-slash-commands \
-  --no-session-persistence --output-format stream-json --include-partial-messages --verbose < /dev/null
-# synthesizer adds: --json-schema "$SCHEMA"
+**Language.** Answers must follow the question's language. Discovered during build: `claude -p`
+on this account answers in Chinese by default due to an account-level preference the CLI
+injects; only an emphatic system-prompt line overrides it (verified across several languages).
 
-# codex — must have < /dev/null. Keep default tool set (disabling breaks prompt cache).
-codex exec --json --skip-git-repo-check --ephemeral -s read-only \
-  -m gpt-5.6-sol -c model_reasoning_effort="high" "$PROMPT" < /dev/null 2>/dev/null
+**UI.** Plain ES modules, no framework; libs bundled locally (no CDN). Fused answer streamed on
+top, analysis panel, raw lanes collapsed with status and latency (raw lanes are not streamed —
+half the complexity for content that is folded away), conversation sidebar, dark mode,
+mobile layout. SSE per turn with an in-memory event buffer so a reload mid-turn replays state.
 
-# kimi — effort is global config (k3 default already high)
-kimi -m kimi-code/k3 --output-format stream-json -p "$PROMPT"
+**Access & auth.** Bound to all interfaces for LAN/Tailscale use; shared password → signed
+httpOnly cookie. Mandatory because both vendors' terms draw the line at letting *other people*
+use your subscription; single-user personal use is documented as intended.
 
-# grok — --deny is the only effective tool block; do NOT use --system-prompt-override
-grok -p "$PROMPT" -m grok-4.6 --reasoning-effort high \
-  --deny 'Write(**)' --deny 'Bash(**)' --deny 'Edit(**)' --disable-web-search --no-subagents \
-  --output-format streaming-messages-json --include-partial-messages
-```
+**Persistence.** SQLite via `node:sqlite` (WAL) under `data/`. Conversations, turns, lane
+results. Turns left "running" by a crash are marked failed at next start.
 
-Concurrency: a per-provider semaphore. `CODEX_MAX_CONCURRENCY=1` by default (OpenAI asks that
-one `auth.json` not be shared across concurrent jobs; raise after a Pro upgrade). Others unlimited.
+**Stack.** Node 22 + TypeScript run directly (type stripping), Hono for HTTP/SSE. Chosen over
+Python because the whole system is subprocess + NDJSON + SSE plumbing where Node is native.
 
-Every panel prompt gets a common preamble: "You are a general assistant. Answer directly in
-markdown. Do not read, write, or execute anything."
-
-## 4. Multi-turn context (stateless replay)
-
-No CLI sessions are used. For turn *N* the prompt is:
-
-```
-<conversation so far>
-Q1 / fused answer 1 / Q2 / fused answer 2 / … / Q(N-1) / fused answer N-1
-</conversation so far>
-Q_N
-```
-
-Only fused answers are replayed (never raw lane answers), so all four models and the synthesizer
-see identical context. History is trimmed from the oldest turn once it exceeds ~60 k characters;
-the UI shows "earliest N turns omitted". A "New conversation" button starts a fresh thread.
-
-## 5. Synthesis
-
-Single Claude call, `--json-schema`, output:
-
-```json
-{
-  "analysis": {
-    "consensus": ["..."],
-    "contradictions": ["..."],
-    "unique_insights": [{"answer": "A", "point": "..."}],
-    "gaps": ["..."]
-  },
-  "answer": "final markdown"
-}
-```
-
-Raw answers are passed **anonymized** as Answer A/B/C/D in shuffled order (the synthesizer is
-also a panelist; anonymization limits self-preference). The UI maps letters back to model names
-only in the collapsed raw section. `answer` is streamed to the UI; `analysis` is rendered as a
-"Where the models disagree" panel. If the synthesizer call fails it falls back to the next
-available provider and the UI says so. With exactly one lane selected, synthesis is skipped.
-
-## 6. Data model (SQLite)
-
-```
-conversations(id, title, created_at)
-turns(id, conversation_id, idx, question, fused_answer, analysis_json, synth_provider,
-      synth_ms, created_at)
-lane_results(turn_id, provider, status, answer, ms, error, exit_code)
-```
-
-## 7. Auth & deployment
-
-`FUSION_PASSWORD` in `.env`; `/login` sets a signed httpOnly cookie; every other route requires
-it. Bind `0.0.0.0:7788` (LAN + Tailscale). `deploy/fusion.service` is a systemd *user* unit
-(`systemctl --user enable --now fusion`).
-
-Terms of service: personal single-user use of `claude -p` / `codex exec` on a subscription is
-documented as intended by both vendors. The hard line is exposing this UI to other people on
-your subscription — hence mandatory password auth. Kimi/xAI terms are silent.
-
-## 8. Out of scope for v1
-
-Selectable synthesizer, web-search toggle, per-lane retry button, history summarization,
-`codex app-server` daemon (would add token streaming and cut ~10 s cold start — provider
-interface is designed so it can be swapped in), streaming raw lane answers.
-
-## 9. Conventions
-
-Code, comments, docs, commits: English. UI copy: English.
+**Conventions.** English everywhere on disk; Chinese in conversation with the owner.

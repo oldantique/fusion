@@ -17,7 +17,8 @@
     "build:vendor": "node --experimental-strip-types scripts/build-vendor.ts",
     "postinstall": "npm run build:vendor",
     "smoke": "node --experimental-strip-types scripts/smoke.ts",
-    "fuse": "node --experimental-strip-types scripts/fuse-cli.ts"
+    "fuse": "node --experimental-strip-types scripts/fuse-cli.ts",
+    "check-docs": "node --experimental-strip-types scripts/check-docs.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",

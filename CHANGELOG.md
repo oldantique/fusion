@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Docs restructured around single-home facts: `.env.example` owns configuration,
+  `fixtures/README.md` owns verified CLI versions, `docs/DESIGN.md` is a dated decision record,
+  `docs/THREADS.md` tracks open work. `npm run check-docs` (part of `npm test`) verifies that
+  docs only reference existing scripts/paths/env vars and keep version numbers in their home.
+
 ## 0.1.0 — 2026-08-20
 
 Initial release.

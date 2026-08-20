@@ -1,31 +1,30 @@
 # Fusion — Runbook
 
-Operational notes for the long-lived deployment on this machine.
+Operational notes for the long-lived deployment on this machine. Settings and their defaults
+live in `.env.example`; CLI invocation details live in `src/providers/`.
 
 ## Where things are
 
 | Thing | Location |
 |---|---|
 | Repo / working dir | `~/others/router` |
-| Runtime data (SQLite, sandbox, screenshots) | `~/others/router/data/` (gitignored) |
-| Database | `data/fusion.sqlite` (WAL: also `-wal`, `-shm`) |
-| Service unit | `deploy/fusion.service` → `~/.config/systemd/user/fusion.service` |
-| Logs (service) | `journalctl --user -u fusion -f` |
+| Runtime state (SQLite, sandbox dir, screenshots) | `data/` inside the repo (gitignored) |
+| Service unit | `deploy/fusion.service` (install steps in its header) |
+| Service logs | `journalctl --user -u fusion -f` |
 | Secrets | `.env` (never committed) |
-| CLI credentials | `~/.claude/`, `~/.codex/auth.json`, `~/.kimi-code/`, `~/.grok/` |
+| CLI credentials | each CLI's own config dir under `$HOME` (`npm run doctor` lists status) |
 
 ## Daily operations
 
 ```bash
 systemctl --user status fusion        # running?
 systemctl --user restart fusion       # after git pull / .env change
-journalctl --user -u fusion -n 200    # recent log
 npm run doctor                        # CLIs present & logged in
-npm run smoke                         # end-to-end per-provider call (costs a few cents)
+npm run smoke                         # one real call per provider (costs a little quota)
 ```
 
-Port: `7788`. Health: `curl -s localhost:7788/api/health` (needs the cookie; a `401` still proves
-the server is up).
+Port and bind address come from `.env`. An unauthenticated request to `/api/health` returning
+`401` still proves the server is up.
 
 ## Upgrading
 
@@ -33,42 +32,40 @@ the server is up).
 2. `npm test && npm run typecheck`.
 3. `systemctl --user restart fusion`.
 
-Schema changes are applied with `CREATE … IF NOT EXISTS` on start; destructive migrations must be
-written by hand and noted in `CHANGELOG.md`.
+The schema is created with `IF NOT EXISTS` on start; destructive migrations must be written by
+hand and noted in `CHANGELOG.md`.
 
 ### After upgrading one of the CLIs
 
 `npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` with the flags in
-`src/providers/index.ts` and compare its NDJSON to `fixtures/`. If the format changed, capture a new
-fixture, adjust the parser, add a test.
+`src/providers/index.ts` and compare its output to `fixtures/`. If the format changed: capture a
+new fixture, record the version in `fixtures/README.md`, adjust the parser, add a test.
 
 ## Failure modes
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Lane fails instantly, error mentions `login`, `auth`, `401`, `token` | CLI session expired | Run the CLI interactively once (`claude`, `codex login`, `kimi`, `grok`) |
-| Lane fails with `timed out after 300s` | Model slow / rate limited | Check provider status; raise `LANE_TIMEOUT_SEC`; untick the lane |
-| `codex` lanes show `queued` for a long time | `CODEX_MAX_CONCURRENCY=1` and several turns in flight | Expected; raise after a Pro upgrade |
-| Lane returns "I cannot access files…" text | A CLI thinks it needs tools | Preamble asks for no tools; check `data/sandbox/` is still empty |
-| Grok answers using repo context | Something placed `CLAUDE.md` in `data/sandbox/` | Remove it; `npm run doctor` flags this |
-| Synth badge "Fallback: Fusing with GPT-5.6 Sol" | Claude synth failed (rate limit) | Answer still produced without analysis; check Claude usage |
-| UI blank after deploy | `web/vendor/bundle.js` missing | `npm run build:vendor` |
-| Turn stuck "running" after server restart | Process died mid-turn | `failStaleTurns()` marks it failed on next start; just re-ask |
-| `FUSION_PASSWORD and FUSION_COOKIE_SECRET must be set` | `.env` missing | Copy `.env.example` |
+| Lane fails instantly; error mentions login/auth/token | CLI session expired | Run that CLI interactively once to re-login |
+| Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
+| codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |
+| Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
+| Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
+| Synth badge says "Fallback: …" | Claude synthesis failed (often rate limit) | Answer still produced without analysis; check Claude usage |
+| UI blank after deploy | frontend bundle missing | `npm run build:vendor` |
+| Turn stuck "running" after a restart | Process died mid-turn | Marked failed automatically on next start; re-ask |
+| Server refuses to start naming env vars | `.env` missing or incomplete | Copy `.env.example` and fill it in |
 
-Rate limits: Claude 5-hour + weekly windows shared with all Claude Code use on this account
-(`rate_limit_event` lines appear in claude's stream). Codex: ChatGPT Plus allows only 10–100
-GPT-5.6 Sol messages per 5 h — four-lane fan-out drains it fast; Pro is 5–20x.
+Rate limits are shared with every other use of the same account (Claude Code, Codex, …) and
+are published by each vendor; a four-lane question costs one call per lane plus one synthesis.
 
 ## Backup
 
-`sqlite3 data/fusion.sqlite ".backup data/backup-$(date +%F).sqlite"` (safe while running thanks to
-WAL). Nothing else is state.
+`sqlite3 data/fusion.sqlite ".backup data/backup-$(date +%F).sqlite"` — safe while running
+(WAL). Nothing else is state.
 
 ## Security posture
 
-- Bound to `0.0.0.0` for LAN/Tailscale; the only protection is the shared password + HMAC cookie
-  (30-day expiry). Use a strong password; rotate `FUSION_COOKIE_SECRET` to log everyone out.
-- No TLS. Don't port-forward this to the public internet; if remote access is needed, use
-  Tailscale (already encrypted).
+- Reachable on the LAN/Tailscale by design; the only protection is the shared password and a
+  signed, expiring cookie. Use a strong password; rotate the cookie secret to log everyone out.
+- No TLS. Don't port-forward to the public internet; use Tailscale for remote access.
 - Models run without tools from an empty directory; they cannot read or write anything.

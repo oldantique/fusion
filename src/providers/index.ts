@@ -1,7 +1,7 @@
 /**
- * The four subscription-backed CLI providers. Flags were verified against the installed
- * versions (claude 2.1.237, codex 0.147.0, kimi 0.36.1, grok 1.0.3) — see docs/DESIGN.md §3
- * and CLAUDE.md before changing any of them.
+ * The four subscription-backed CLI providers. This file is the single home for how each CLI
+ * is invoked; the versions these flags were verified against are recorded in fixtures/README.md.
+ * Read the gotchas in CLAUDE.md before changing any flag.
  */
 import { config } from "../config.ts";
 import { createAnthropicStreamParser } from "../parsers/anthropic-stream.ts";
