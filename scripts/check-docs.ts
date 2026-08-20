@@ -15,8 +15,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DOCS = ["README.md", "CLAUDE.md", "CHANGELOG.md", "docs/DESIGN.md", "docs/RUNBOOK.md", "docs/THREADS.md", "fixtures/README.md", "deploy/fusion.service"];
-const PATH_ROOTS = ["src", "web", "scripts", "tests", "fixtures", "deploy", "docs", "data"];
+const DOCS = ["README.md", "CLAUDE.md", "CHANGELOG.md", "docs/DESIGN.md", "docs/RUNBOOK.md", "docs/THREADS.md", "fixtures/README.md", "deploy/fusion.service", ".claude/skills/sync-docs/SKILL.md"];
+const PATH_ROOTS = ["src", "web", "scripts", "tests", "fixtures", "deploy", "docs", "data", ".claude"];
 const ROOT_FILES = ["README.md", "CLAUDE.md", "CHANGELOG.md", "LICENSE", "package.json", "tsconfig.json", ".env", ".env.example", ".gitignore"];
 const VERSION_HOMES = new Set(["fixtures/README.md", "CHANGELOG.md"]);
 
