@@ -5,17 +5,16 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
-import { loadDotenv } from "./dotenv.ts";
+import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
+import { Store } from "../store/db.ts";
+import { Jobs } from "./jobs.ts";
+import { ALL_PROVIDERS, PROVIDER_LABELS, type ProviderId } from "../types.ts";
+import { providers } from "../providers/index.ts";
+import { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } from "./auth.ts";
 
-loadDotenv();
-// config reads process.env at import time, so import it after .env is loaded.
-const { config } = await import("../config.ts");
-const { Store } = await import("../store/db.ts");
-const { Jobs } = await import("./jobs.ts");
-const { ALL_PROVIDERS, PROVIDER_LABELS } = await import("../types.ts");
-const { providers } = await import("../providers/index.ts");
-const { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } = await import("./auth.ts");
-type ProviderId = import("../types.ts").ProviderId;
+// Relative paths (static root, anything a library resolves against cwd) must not depend on where
+// the process was launched from; children get an explicit cwd of their own.
+process.chdir(config.root);
 
 if (!config.password || !config.cookieSecret) {
   console.error("FUSION_PASSWORD and FUSION_COOKIE_SECRET must be set (see .env.example).");

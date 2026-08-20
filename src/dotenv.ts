@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export function loadDotenv(file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", ".env")) {
+export function loadDotenv(file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".env")) {
   if (!fs.existsSync(file)) return;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
     const line = raw.trim();
