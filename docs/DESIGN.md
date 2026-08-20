@@ -84,3 +84,42 @@ question/answer pair; a fallback synthesizer would leave the session one turn be
 prompt-cache win is small because turns are minutes apart. Revisit only as an experiment
 behind a flag with a per-conversation letter mapping — see `docs/THREADS.md`. The general cure
 for long histories is summarization, which helps all lanes.
+
+## 2026-08-20 — Lifecycle hardening after an external review
+
+Two headless reviews (codex, kimi) of the repo plus an in-tree audit produced these corrections;
+each supersedes the matching sentence in the initial entry above.
+
+**"Tools off" is prompt + no-write, not containment.** Panel lanes are told they have no tools,
+and the spawn sandbox is an empty directory; but codex keeps its default tool set in a read-only
+sandbox (disabling tools defeats its prompt cache), grok only denies the write/edit/shell
+families, and kimi has no permission gate at all in `-p` mode. So a lane can read; it cannot
+write. Accepted for a single-user tool on the owner's machine; the prompts additionally declare
+candidate and history text untrusted, and closing tags inside it are neutralised so content
+cannot end a block early.
+
+**Anonymisation is ordering blinding.** Shuffled letters remove position bias and stop the
+synthesizer from being *told* which answer is whose; they do not stop it recognising its own
+style. Excluding the synthesizer's own lane was rejected (loses a candidate); the analysis must
+say "candidate X" and only that phrase is de-anonymised in the UI.
+
+**Retry is classified.** Only a non-zero exit or an empty answer gets the single retry, after a
+short pause; a timeout (would time out again), an abort, a spawn failure or an internal error
+fails immediately. The synthesizer chain runs each candidate once under one shared lane-timeout.
+When every synthesizer fails, the best raw lane answer (same preference order) is shown and
+marked "Unfused" — consistent with the single-lane case, so history replay is unchanged.
+Fallback order prefers grok over codex because it streams and is fast.
+
+**Cancellation is a status.** `cancelled` is recorded and streamed as its own event, never as
+"all lanes failed"; the UI has a Stop button; shutdown aborts jobs and waits briefly for them.
+
+**Turns are serialised per conversation** (409 while one runs; unique `(conversation_id, idx)`),
+and a conversation with a running turn cannot be deleted. SSE events carry sequence ids and
+resume from `Last-Event-ID`; finished lanes' deltas are compacted out of the replay buffer.
+
+**Processes are groups.** Children are their own process group and the group is signalled;
+timeout and abort hooks stay armed until the child has actually exited.
+
+**Loopback by default.** `FUSION_HOST` defaults to the loopback address; LAN/Tailscale is an explicit
+opt-in documented as running without TLS. The earlier "bound to all interfaces" default is gone.
+

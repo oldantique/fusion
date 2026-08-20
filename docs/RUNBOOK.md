@@ -47,6 +47,8 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 |---|---|---|
 | Lane fails instantly; error mentions login/auth/token | CLI session expired | Run that CLI interactively once to re-login |
 | kimi fails with "OAuth … fetch failed" only under the service, works in a shell | IPv6 half-connectivity; Node gives up before falling back to IPv4 | Already handled in `childEnv()` (`src/providers/process.ts`); if it recurs, check `curl -6` egress and the CLI's runtime |
+| Ask returns "turn in progress" / delete refused | That conversation already has a running turn | Wait or press Stop; one turn per conversation at a time |
+| Synth badge says "Unfused: …" | Every synthesizer failed; one lane's raw answer is shown | Read the lane errors; usually a Claude rate limit |
 | Lane fails with a terse or odd error, usually the same lane every time | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI; some CLIs do not say "quota") | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
 | Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |
@@ -71,4 +73,6 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 - Reachable on the LAN/Tailscale by design; the only protection is the shared password and a
   signed, expiring cookie. Use a strong password; rotate the cookie secret to log everyone out.
 - No TLS. Don't port-forward to the public internet; use Tailscale for remote access.
-- Models run without tools from an empty directory; they cannot read or write anything.
+- Lanes are told they have no tools and are spawned from an empty directory, but this is prompt
+  + no-write, not containment (see `docs/DESIGN.md`): a lane could read files on this machine.
+  Fine for one owner's box; another reason not to expose the UI to anyone else.

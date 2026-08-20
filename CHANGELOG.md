@@ -7,6 +7,18 @@
   `docs/THREADS.md` tracks open work. `npm run check-docs` (part of `npm test`) verifies that
   docs only reference existing scripts/paths/env vars and keep version numbers in their home.
 - `sync-docs` skill (`.claude/skills/sync-docs/`) for the judgement half of drift control.
+- Stop button; cancelled turns are recorded and shown as "Stopped" instead of failed.
+- One running turn per conversation (the server answers 409 otherwise); a conversation with a
+  running turn cannot be deleted.
+- SSE reconnects resume where they left off instead of replaying the whole turn (no more
+  duplicated text after a network hiccup).
+- When every synthesizer fails, the best raw answer is shown and marked "Unfused" rather than
+  the turn failing.
+- Retries only for transient failures; timeouts fail fast. CLI helper processes are killed with
+  their parent; graceful shutdown waits for running turns to cancel.
+- `.env` is loaded by every entry point (`npm run smoke` / `fuse` previously ran with defaults);
+  integer settings are validated; `FUSION_HOST` now defaults to loopback.
+- kimi lanes work under systemd (IPv4 fallback option passed to the child).
 
 ## 0.1.0 — 2026-08-20
 
