@@ -12,6 +12,17 @@ function int(name: string, dflt: number): number {
   return n;
 }
 
+// Intersection of the effort vocabularies of the CLIs that take the flag (each accepts more, e.g.
+// claude/codex also take "max"; grok does not). claude treats an unknown value as "use the
+// default" with exit 0, so a typo must be caught here rather than discovered in the output.
+const EFFORTS = ["low", "medium", "high", "xhigh"];
+
+function effort(): string {
+  const v = process.env.FUSION_EFFORT ?? "high";
+  if (!EFFORTS.includes(v)) throw new Error(`FUSION_EFFORT must be one of ${EFFORTS.join("|")}, got "${v}"`);
+  return v;
+}
+
 export const config = {
   root: ROOT,
   dataDir: path.join(ROOT, "data"),
@@ -43,7 +54,7 @@ export const config = {
     kimi: process.env.KIMI_MODEL ?? "kimi-code/k3",
     grok: process.env.GROK_MODEL ?? "grok-4.6",
   },
-  effort: process.env.FUSION_EFFORT ?? "high",
+  effort: effort(),
 };
 
 export type Config = typeof config;

@@ -43,6 +43,10 @@ export function childEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessE
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(base)) {
     if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_") || k === "CLAUDE_PID" || k === "CLAUDE_EFFORT") continue;
+    // Note this also drops CLAUDE_CODE_MAX_OUTPUT_TOKENS. Deliberate for now: the CLI's per-model
+    // default is generous and it auto-continues past the cap (only --output-format json loses the
+    // head of the answer; the stream parser accumulates every message). If the synthesizer's
+    // structured output ever truncates, whitelist that one variable here and set it in .env.
     env[k] = v;
   }
   return env;

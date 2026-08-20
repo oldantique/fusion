@@ -37,6 +37,9 @@ export function cliProvider(spec: CliProviderSpec): Provider {
       let exit: ProcessExit | undefined;
       let sawDone = false;
       let sawError = false;
+      // claude prints some failures (empty prompt, auth, quota) as plain text on *stdout* with an
+      // empty stderr, so non-JSON stdout lines are kept for the error message.
+      const plain: string[] = [];
 
       for await (const item of runLines({ cmd: inv.cmd, args: inv.args, stdin: inv.stdin, signal: opts.signal })) {
         if (item.kind === "exit") {
@@ -44,6 +47,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
           break;
         }
         const obj = tryJson(item.line);
+        if (obj === undefined && item.line.trim()) plain.push(item.line);
         const events = obj !== undefined ? parser.feed(obj) : (spec.plainLine?.(item.line, parser) ?? []);
         for (const ev of events) {
           if (ev.type === "done") sawDone = true;
@@ -66,7 +70,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         return;
       }
       if (exit.code !== 0) {
-        yield { type: "error", message: `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${tail(exit.stderr)}` };
+        yield { type: "error", message: `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${diagnostics(exit.stderr, plain)}` };
         return;
       }
       if (!sawDone) {
@@ -75,11 +79,17 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         if (parser.state.text.trim().length > 0) {
           yield { type: "done", text: parser.state.text };
         } else {
-          yield { type: "error", message: `no output (exit 0). stderr: ${tail(exit.stderr)}` };
+          yield { type: "error", message: `no output (exit 0): ${diagnostics(exit.stderr, plain)}` };
         }
       }
     },
   };
+}
+
+/** stderr first, then whatever non-JSON text the CLI put on stdout; "(no diagnostics)" if both are empty. */
+function diagnostics(stderr: string, plain: string[]): string {
+  const parts = [tail(stderr), tail(plain.slice(-5).join("\n"))].filter(Boolean);
+  return parts.length ? parts.join(" | ") : "(no diagnostics)";
 }
 
 function tail(s: string, n = 600): string {

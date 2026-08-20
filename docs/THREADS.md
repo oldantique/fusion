@@ -13,6 +13,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 6 | Raise codex concurrency after plan upgrade | BLOCKED-by-owner | Config only (`CODEX_MAX_CONCURRENCY`) |
 | 8 | Stream raw lane answers (claude/grok can) | ON-HOLD | Deliberately skipped in v1 |
 | 9 | Synthesizer via `claude --resume` (session memory) | ON-HOLD | v2 experiment only, behind a flag, with per-conversation letter mapping; rationale in `docs/DESIGN.md` |
+| 10 | Surface claude's `rate_limit_event` (five-hour window reset time, overage flag) in the UI | OPEN | Shape verified 2026-08-20: one event per call, position varies, only says `allowed`/reset time — low value until a non-allowed state is observed |
 
 ## Archive
 
