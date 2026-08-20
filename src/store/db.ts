@@ -71,6 +71,10 @@ export interface TurnRow {
   lanes: LaneResult[];
 }
 
+function plainConversation(r: any): ConversationRow {
+  return { id: r.id, title: r.title, created_at: r.created_at, updated_at: r.updated_at, turn_count: r.turn_count };
+}
+
 export class Store {
   private db: DatabaseSync;
 
@@ -95,19 +99,20 @@ export class Store {
   }
 
   listConversations(limit = 200): ConversationRow[] {
-    return this.db
+    const rows = this.db
       .prepare(
         `SELECT c.*, (SELECT COUNT(*) FROM turns t WHERE t.conversation_id = c.id) AS turn_count
          FROM conversations c ORDER BY updated_at DESC LIMIT ?`,
       )
-      .all(limit) as unknown as ConversationRow[];
+      .all(limit) as any[];
+    return rows.map(plainConversation);
   }
 
   getConversation(id: string): ConversationRow | null {
     const row = this.db
       .prepare(`SELECT c.*, (SELECT COUNT(*) FROM turns t WHERE t.conversation_id = c.id) AS turn_count FROM conversations c WHERE id = ?`)
-      .get(id) as unknown as ConversationRow | undefined;
-    return row ?? null;
+      .get(id) as any;
+    return row ? plainConversation(row) : null;
   }
 
   renameConversation(id: string, title: string) {
@@ -122,11 +127,10 @@ export class Store {
 
   /** History for replay: completed turns with a fused answer, in order. */
   history(conversationId: string): HistoryTurn[] {
-    return (
-      this.db
-        .prepare("SELECT question, answer FROM turns WHERE conversation_id = ? AND status = 'done' AND answer IS NOT NULL ORDER BY idx")
-        .all(conversationId) as unknown as HistoryTurn[]
-    );
+    const rows = this.db
+      .prepare("SELECT question, answer FROM turns WHERE conversation_id = ? AND status = 'done' AND answer IS NOT NULL ORDER BY idx")
+      .all(conversationId) as any[];
+    return rows.map((r) => ({ question: r.question, answer: r.answer }));
   }
 
   startTurn(conversationId: string, question: string, providers: ProviderId[]): TurnRow {
