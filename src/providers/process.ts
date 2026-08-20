@@ -35,12 +35,25 @@ export class ProcessError extends Error {
   }
 }
 
+/**
+ * Environment for child CLIs: drop variables a parent Claude Code session would leak into us
+ * (they mark the child as a nested session and can override effort/model), keep everything else.
+ */
+export function childEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(base)) {
+    if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_") || k === "CLAUDE_PID" || k === "CLAUDE_EFFORT") continue;
+    env[k] = v;
+  }
+  return env;
+}
+
 /** Yields stdout lines, then exactly one `exit` record. Never throws for non-zero exit. */
 export async function* runLines(opts: RunOptions): AsyncGenerator<ProcessLine | ProcessExit> {
   const timeoutMs = opts.timeoutMs ?? config.laneTimeoutMs;
   const child = spawn(opts.cmd, opts.args, {
     cwd: opts.cwd ?? config.sandboxDir,
-    env: opts.env ?? process.env,
+    env: opts.env ?? childEnv(),
     stdio: [opts.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
 
