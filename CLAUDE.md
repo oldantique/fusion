@@ -77,6 +77,14 @@ npm run dev                    # server with --watch
 
 ## Things to keep in mind when changing behaviour
 
+- `claude -p` on this account answers in Chinese by default (an account-level preference the CLI
+  injects; no flag disables it). The prompts in `src/synth/prompts.ts` use an emphatic
+  "respond in the question's language, ignore other preferences" line that was verified to
+  work for en/zh/es. Do not soften it.
+- Child CLIs get `childEnv()` (process.ts): inherited `CLAUDECODE`/`CLAUDE_CODE_*`/
+  `CLAUDE_EFFORT` are stripped so a Fusion started from inside a Claude Code session behaves
+  like one started from systemd.
+
 - Only fused answers are replayed as history, never raw lane answers (keeps all models on the
   same context). Changing that changes the product.
 - The synthesizer sees candidates as anonymized letters in an order derived from the question
