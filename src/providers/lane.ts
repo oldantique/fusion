@@ -10,13 +10,13 @@ const semaphores: Record<ProviderId, Semaphore> = {
   grok: new Semaphore(config.concurrency.grok),
 };
 
-export type LaneSink = (ev: LaneEvent | { type: "status"; status: "queued" | "running"; attempt: number }) => void;
+export type LaneSink = (ev: LaneEvent | { type: "status"; status: "queued" | "running"; attempt: number; at: number }) => void;
 
 export async function runLane(provider: Provider, opts: CallOptions, sink: LaneSink): Promise<LaneResult> {
   const started = Date.now();
   const sem = semaphores[provider.id];
   if (sem.isFull) {
-    sink({ type: "status", status: "queued", attempt: 0 });
+    sink({ type: "status", status: "queued", attempt: 0, at: Date.now() });
   }
   const release = await sem.acquire();
   let lastError = "unknown";
@@ -27,7 +27,7 @@ export async function runLane(provider: Provider, opts: CallOptions, sink: LaneS
         lastError = "aborted";
         break;
       }
-      sink({ type: "status", status: "running", attempt });
+      sink({ type: "status", status: "running", attempt, at: Date.now() });
       let text: string | null = null;
       let usage: LaneResult["usage"];
       let error: string | null = null;

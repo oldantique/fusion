@@ -32,7 +32,7 @@ function streamer(el) {
 // ---------- api ----------
 async function api(path, opts = {}) {
   const res = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
-  if (res.status === 401) { showLogin(); throw new Error("unauthorized"); }
+  if (res.status === 401 && path !== "/api/login") { showLogin(); throw new Error("Session expired — please sign in again"); }
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
   return res.json();
 }
@@ -93,7 +93,7 @@ async function loadConversations() {
       e.stopPropagation();
       if (!confirm(`Delete "${c.title}"?`)) return;
       await api(`/api/conversations/${c.id}`, { method: "DELETE" });
-      if (state.current?.id === c.id) { state.current = null; $("#turns").innerHTML = ""; $("#conv-title").textContent = "Fusion"; }
+      if (state.current?.id === c.id) { state.current = null; $("#turns").innerHTML = ""; $("#conv-title").textContent = "Fusion"; showEmpty("Conversation deleted. Ask something to start a new one."); }
       await loadConversations();
     });
     li.append(t, n, del);
@@ -109,16 +109,29 @@ async function openConversation(id) {
   document.querySelectorAll("#conv-list li").forEach((li) => li.classList.toggle("active", li.dataset.id === id));
   const box = $("#turns");
   box.innerHTML = "";
+  if (conv.turns.length === 0) showEmpty("Ask a question below — it goes to every selected model at once.");
   for (const t of conv.turns) {
     const view = mountTurn(t.question, t.providers);
     if (t.status === "running") {
-      followTurn(t.id, view);
+      setBusy(true);
+      followTurn(t.id, view).finally(() => { setBusy(false); loadConversations(); });
     } else {
       paintFinishedTurn(view, t);
     }
   }
   box.scrollTop = box.scrollHeight;
   if (window.matchMedia("(max-width: 760px)").matches) setSidebar(false);
+}
+
+function showEmpty(msg) {
+  const d = document.createElement("div");
+  d.className = "empty";
+  d.textContent = msg;
+  $("#turns").append(d);
+}
+function setBusy(b) {
+  state.busy = b;
+  $("#send").disabled = b;
 }
 
 // ---------- provider picker ----------
@@ -132,7 +145,7 @@ function renderPicks() {
     cb.type = "checkbox";
     cb.value = p.id;
     cb.checked = saved ? saved.includes(p.id) : true;
-    cb.addEventListener("change", () => localStorage.setItem(PICK_KEY, JSON.stringify(pickedProviders())));
+    cb.addEventListener("change", () => { localStorage.setItem(PICK_KEY, JSON.stringify(pickedProviders())); $("#composer-note").textContent = ""; });
     label.append(cb, document.createTextNode(` ${p.label}`));
     label.title = p.model + (p.streams ? " · streams" : "");
     box.append(label);
@@ -156,6 +169,7 @@ function mountTurn(question, providerIds) {
     lanesBox.append(ln);
     lanes[id] = { el: ln, status: ln.querySelector(".lane-status"), meta: ln.querySelector(".lane-meta"), body: streamer(ln.querySelector(".lane-body")), startedAt: null, timer: null };
   }
+  $("#turns").querySelector(".empty")?.remove();
   $("#turns").append(node);
   const view = {
     el: node,
@@ -174,8 +188,8 @@ function mountTurn(question, providerIds) {
 function badge(el, text, cls) { el.textContent = text; el.className = el.className.replace(/\b(ok|bad|run)\b/g, "").trim() + (cls ? ` ${cls}` : ""); }
 const secs = (ms) => `${(ms / 1000).toFixed(1)}s`;
 
-function startLaneClock(lane) {
-  lane.startedAt = Date.now();
+function startLaneClock(lane, at) {
+  lane.startedAt = at || Date.now();
   clearInterval(lane.timer);
   lane.timer = setInterval(() => { lane.meta.textContent = secs(Date.now() - lane.startedAt); }, 250);
 }
@@ -251,7 +265,7 @@ function followTurn(turnId, view) {
       const lane = view.lanes[ev.provider];
       if (!lane) return;
       if (ev.status === "queued") badge(lane.status, "queued", "");
-      else if (ev.status === "running") { badge(lane.status, ev.attempt > 1 ? `retrying` : "running", "run"); startLaneClock(lane); }
+      else if (ev.status === "running") { badge(lane.status, ev.attempt > 1 ? `retrying` : "running", "run"); startLaneClock(lane, ev.at); }
       else if (ev.status === "delta") lane.body.append(ev.text);
       else paintLaneResult(lane, ev.result);
       keep();
@@ -292,8 +306,7 @@ async function ask() {
     const conv = await api("/api/conversations", { method: "POST", body: JSON.stringify({}) });
     state.current = { ...conv, turns: [] };
   }
-  state.busy = true;
-  $("#send").disabled = true;
+  setBusy(true);
   $("#composer-note").textContent = "";
   $("#question").value = "";
   const view = mountTurn(q, providers);
@@ -301,15 +314,14 @@ async function ask() {
   try {
     const { turnId } = await api(`/api/conversations/${state.current.id}/ask`, { method: "POST", body: JSON.stringify({ question: q, providers }) });
     await loadConversations();
-    await followTurn(turnId, view);
     const conv = state.conversations.find((c) => c.id === state.current.id);
     if (conv) $("#conv-title").textContent = conv.title;
+    await followTurn(turnId, view);
   } catch (err) {
     badge(view.synthBadge, "Failed", "bad");
     view.synthMeta.textContent = err.message;
   } finally {
-    state.busy = false;
-    $("#send").disabled = false;
+    setBusy(false);
     await loadConversations();
     $("#question").focus();
   }
@@ -324,10 +336,12 @@ async function boot() {
   const me = await fetch("/api/me").then((r) => r.json());
   if (!me.authenticated) { showLogin(); return; }
   showApp();
+  if (window.matchMedia("(max-width: 760px)").matches) setSidebar(false);
   state.providers = await api("/api/providers");
   renderPicks();
   await loadConversations();
   if (state.conversations[0]) await openConversation(state.conversations[0].id);
+  else showEmpty("Ask a question below — it goes to every selected model at once.");
   $("#question").focus();
 }
 boot();

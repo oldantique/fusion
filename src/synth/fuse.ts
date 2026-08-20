@@ -5,7 +5,7 @@ import type { Analysis, HistoryTurn, LaneResult, ProviderId, SynthesisResult } f
 import { PANEL_SYSTEM, SYNTH_SCHEMA, SYNTH_SYSTEM, panelPrompt, renderHistory, synthPrompt } from "./prompts.ts";
 
 export type FuseEvent =
-  | { type: "lane"; provider: ProviderId; status: "queued" | "running"; attempt: number }
+  | { type: "lane"; provider: ProviderId; status: "queued" | "running"; attempt: number; at: number }
   | { type: "lane"; provider: ProviderId; status: "delta"; text: string }
   | { type: "lane"; provider: ProviderId; status: "done"; result: LaneResult }
   | { type: "lane"; provider: ProviderId; status: "failed"; result: LaneResult }
@@ -47,7 +47,7 @@ export async function fuse(input: FuseInput): Promise<FuseOutput> {
   const lanes = await Promise.all(
     ids.map((id) =>
       runLane(providers[id], { prompt, system: PANEL_SYSTEM, signal }, (ev) => {
-        if (ev.type === "status") onEvent({ type: "lane", provider: id, status: ev.status, attempt: ev.attempt });
+        if (ev.type === "status") onEvent({ type: "lane", provider: id, status: ev.status, attempt: ev.attempt, at: ev.at });
         else if (ev.type === "delta") onEvent({ type: "lane", provider: id, status: "delta", text: ev.text });
       }).then((result) => {
         onEvent({ type: "lane", provider: id, status: result.status === "done" ? "done" : "failed", result });
