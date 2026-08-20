@@ -40,10 +40,11 @@ file exactly once. No test reaches memory; check its paths by hand.
 
 - `check-docs-green` — `npm run check-docs` passes. If it names a problem, fix the doc (or move
   the fact to its home), never weaken the check to make it pass.
-- `code-owns-behaviour` — if `src/providers/`, `src/synth/prompts.ts` or `src/config.ts`
-  changed since the last sync (`git log`), re-read every CLAUDE.md gotcha and every RUNBOOK
-  failure-mode row that describes that behaviour; a gotcha that now contradicts the code is
-  deleted or corrected, not annotated. Gotchas stay one-line claim + pointer.
+- `code-owns-behaviour` — if `src/providers/`, `src/synth/`, `src/server/jobs.ts` or
+  `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
+  RUNBOOK failure-mode row and the newest DESIGN entry that describes that behaviour; a sentence
+  that now contradicts the code is deleted or corrected, not annotated. Gotchas stay one-line
+  claim + pointer.
 - `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run doctor` shows
   versions), `npm run smoke` must pass; a changed output format means a new fixture, a new row
   in `fixtures/README.md`, and parser + test updates in the same commit. Premises that a CLI
