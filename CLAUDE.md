@@ -84,7 +84,6 @@ npm run dev                    # server with --watch
 - Child CLIs get `childEnv()` (process.ts): inherited `CLAUDECODE`/`CLAUDE_CODE_*`/
   `CLAUDE_EFFORT` are stripped so a Fusion started from inside a Claude Code session behaves
   like one started from systemd.
-
 - Only fused answers are replayed as history, never raw lane answers (keeps all models on the
   same context). Changing that changes the product.
 - The synthesizer sees candidates as anonymized letters in an order derived from the question
