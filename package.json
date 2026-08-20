@@ -1,0 +1,24 @@
+{
+  "name": "fusion",
+  "version": "0.1.0",
+  "description": "Self-hosted multi-model fusion over local subscription CLIs (claude, codex, kimi, grok)",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/server/main.ts",
+    "start": "node --experimental-strip-types src/server/main.ts",
+    "test": "node --experimental-strip-types --test \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "doctor": "node --experimental-strip-types scripts/doctor.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,3 @@
+{"role":"meta","type":"system.version","version":"0.36.1"}
+{"role":"assistant","content":"The capital of France is Paris."}
+{"role":"meta","type":"session.resume_hint","session_id":"session_a697efee-7df0-4481-a347-e39eef7d3aa5","command":"kimi -r session_a697efee-7df0-4481-a347-e39eef7d3aa5","content":"To resume this session: kimi -r session_a697efee-7df0-4481-a347-e39eef7d3aa5"}
