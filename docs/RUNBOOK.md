@@ -46,6 +46,7 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Lane fails instantly; error mentions login/auth/token | CLI session expired | Run that CLI interactively once to re-login |
+| kimi fails with "OAuth … fetch failed" only under the service, works in a shell | IPv6 half-connectivity; Node gives up before falling back to IPv4 | Already handled in `childEnv()` (`src/providers/process.ts`); if it recurs, check `curl -6` egress and the CLI's runtime |
 | Lane fails with a terse or odd error, usually the same lane every time | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI; some CLIs do not say "quota") | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
 | Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |

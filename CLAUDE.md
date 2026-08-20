@@ -69,7 +69,9 @@ turn in the terminal), `test`, `typecheck`, `check-docs`, `dev`.
   not every tool name is a valid prefix (the CLI rejects unknown ones at startup). Its
   `streaming-messages-json` is wire-compatible with claude's stream. `--system-prompt-override`
   defeats the prompt cache.
-- **kimi** has no permission gate in `-p` mode and no effort flag (global config only).
+- **kimi** has no permission gate in `-p` mode and no effort flag (global config only). It is a
+  Node binary and needs the IPv4-fallback option that `childEnv()` appends; without it every call
+  fails with an OAuth "fetch failed" on this host (interactive shells get it from `.bashrc`).
 - `claude --json-schema` output streams as `input_json_delta` fragments; the final object is in
   `result.structured_output`. `src/parsers/json-field-stream.ts` exists to stream one field of it.
 - Only *fused* answers are replayed as conversation history, never raw lane answers.
