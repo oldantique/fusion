@@ -6,7 +6,7 @@ already pay for**, no API keys.
 Fusion fans a question out in parallel to the locally installed `claude`, `codex`, `kimi` and
 `grok` CLIs (each logged in with its normal subscription), then has Claude Opus merge the
 answers into one Markdown response and explain where the models disagreed. It runs as a small
-local web app you can open from any device on your LAN or Tailscale network.
+local web app; opening it to your LAN or Tailscale network is a one-line opt-in in `.env`.
 
 ```
                  ┌─ claude ─────┐
@@ -62,8 +62,8 @@ vendors draw; hence the mandatory password.
 
 ## Development
 
-`npm test` (parser tests replay captured CLI output from `fixtures/`, plus a docs consistency
-check), `npm run typecheck`, `npm run fuse -- "question"` for a full turn in the terminal,
+`npm test` (parser tests replay captured CLI output from `fixtures/`, orchestration tests run
+against stub providers, plus a docs consistency check), `npm run typecheck`, `npm run fuse -- "question"` for a full turn in the terminal,
 `npm run dev` for a watching server.
 
 Design rationale: [`docs/DESIGN.md`](docs/DESIGN.md). Open work: [`docs/THREADS.md`](docs/THREADS.md).
