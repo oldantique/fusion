@@ -5,20 +5,30 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/server/main.ts",
     "start": "node --experimental-strip-types src/server/main.ts",
     "test": "node --experimental-strip-types --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "doctor": "node --experimental-strip-types scripts/doctor.ts"
+    "doctor": "node --experimental-strip-types scripts/doctor.ts",
+    "build:vendor": "node --experimental-strip-types scripts/build-vendor.ts",
+    "postinstall": "npm run build:vendor",
+    "smoke": "node --experimental-strip-types scripts/smoke.ts",
+    "fuse": "node --experimental-strip-types scripts/fuse-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
-    "hono": "^4.7.0"
+    "dompurify": "^3.4.14",
+    "highlight.js": "^11.12.0",
+    "hono": "^4.7.0",
+    "marked": "^18.0.10"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.8.0"
   }
 }

@@ -1,0 +1,23 @@
+# systemd *user* unit for Fusion.
+# Install:  mkdir -p ~/.config/systemd/user && cp deploy/fusion.service ~/.config/systemd/user/
+#           systemctl --user daemon-reload && systemctl --user enable --now fusion
+#           loginctl enable-linger $USER     # keep it running when you are logged out
+# Logs:     journalctl --user -u fusion -f
+[Unit]
+Description=Fusion — multi-model answer fusion over local subscription CLIs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/others/router
+# Same PATH the interactive shell has, so claude/codex/kimi/grok resolve.
+Environment=PATH=%h/.npm-global/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node --experimental-strip-types src/server/main.ts
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target
