@@ -53,7 +53,7 @@ export function createAnthropicStreamParser(streamJsonField?: string) {
       state.result = obj;
       if (obj.is_error) {
         const msg = typeof obj.result === "string" ? obj.result : obj.error ?? "provider reported is_error";
-        return [{ type: "error", message: String(msg) }];
+        return [{ type: "error", message: String(msg), kind: "exit" }];
       }
       if (obj.structured_output !== undefined && obj.structured_output !== null) {
         const so = obj.structured_output;

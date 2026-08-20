@@ -33,7 +33,7 @@ export function createCodexParser() {
     }
     if (obj.type === "turn.failed" || obj.type === "error") {
       state.done = true;
-      return [{ type: "error", message: String(obj.error?.message ?? obj.message ?? "codex turn failed") }];
+      return [{ type: "error", message: String(obj.error?.message ?? obj.message ?? "codex turn failed"), kind: "exit" }];
     }
     return [];
   }
@@ -54,7 +54,7 @@ export function createKimiParser() {
     }
     if (obj.role === "error" || obj.type === "error") {
       state.done = true;
-      return [{ type: "error", message: String(obj.content ?? obj.message ?? "kimi error") }];
+      return [{ type: "error", message: String(obj.content ?? obj.message ?? "kimi error"), kind: "exit" }];
     }
     return [];
   }

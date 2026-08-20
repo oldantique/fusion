@@ -58,19 +58,19 @@ export function cliProvider(spec: CliProviderSpec): Provider {
 
       if (sawError) return;
       if (!exit) {
-        yield { type: "error", message: "process ended without exit record" };
+        yield { type: "error", message: "process ended without exit record", kind: "internal" };
         return;
       }
       if (exit.timedOut) {
-        yield { type: "error", message: `timed out after ${config.laneTimeoutMs / 1000}s` };
+        yield { type: "error", message: `timed out after ${config.laneTimeoutMs / 1000}s`, kind: "timeout" };
         return;
       }
       if (exit.aborted) {
-        yield { type: "error", message: "aborted" };
+        yield { type: "error", message: "aborted", kind: "aborted" };
         return;
       }
       if (exit.code !== 0) {
-        yield { type: "error", message: `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${diagnostics(exit.stderr, plain)}` };
+        yield { type: "error", message: `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${diagnostics(exit.stderr, plain)}`, kind: exit.spawnFailed ? "spawn" : "exit" };
         return;
       }
       if (!sawDone) {
@@ -79,7 +79,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         if (parser.state.text.trim().length > 0) {
           yield { type: "done", text: parser.state.text };
         } else {
-          yield { type: "error", message: `no output (exit 0): ${diagnostics(exit.stderr, plain)}` };
+          yield { type: "error", message: `no output (exit 0): ${diagnostics(exit.stderr, plain)}`, kind: "empty" };
         }
       }
     },

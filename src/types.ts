@@ -11,12 +11,19 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   grok: "Grok 4.6",
 };
 
+/**
+ * Why a call failed. Drives the retry decision in `runLane`: only `exit` (non-zero exit, cause
+ * unknown) and `empty` (clean exit, no answer) are worth a second attempt; a timeout will most
+ * likely time out again, and abort/spawn/internal failures cannot be fixed by retrying.
+ */
+export type LaneErrorKind = "timeout" | "aborted" | "spawn" | "exit" | "empty" | "internal";
+
 /** Events emitted by a provider while a call is running. */
 export type LaneEvent =
   | { type: "delta"; text: string }
   | { type: "thinking"; text: string }
   | { type: "done"; text: string; usage?: Usage; structured?: unknown }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string; kind: LaneErrorKind };
 
 export interface Usage {
   inputTokens?: number;
@@ -54,6 +61,8 @@ export interface CallOptions {
   /** With jsonSchema: name of the string field to stream as deltas (e.g. "answer"). */
   streamField?: string;
   signal?: AbortSignal;
+  /** Override the configured attempt count (the synthesizer chain uses one attempt per provider). */
+  attempts?: number;
 }
 
 export interface Provider {
