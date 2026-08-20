@@ -39,7 +39,7 @@ async function api(path, opts = {}) {
 
 // ---------- state ----------
 const $ = (s) => document.querySelector(s);
-const state = { providers: [], conversations: [], current: null, busy: false };
+const state = { providers: [], conversations: [], current: null, busy: false, followingTurnId: null };
 const PICK_KEY = "fusion.providers";
 
 // ---------- login ----------
@@ -92,7 +92,12 @@ async function loadConversations() {
     del.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (!confirm(`Delete "${c.title}"?`)) return;
-      await api(`/api/conversations/${c.id}`, { method: "DELETE" });
+      try {
+        await api(`/api/conversations/${c.id}`, { method: "DELETE" });
+      } catch (err) {
+        $("#composer-note").textContent = err.message;
+        return;
+      }
       if (state.current?.id === c.id) { state.current = null; $("#turns").innerHTML = ""; $("#conv-title").textContent = "Fusion"; showEmpty("Conversation deleted. Ask something to start a new one."); }
       await loadConversations();
     });
@@ -132,6 +137,7 @@ function showEmpty(msg) {
 function setBusy(b) {
   state.busy = b;
   $("#send").disabled = b;
+  $("#stop").classList.toggle("hidden", !b);
 }
 
 // ---------- provider picker ----------
@@ -185,7 +191,7 @@ function mountTurn(question, providerIds) {
   return view;
 }
 
-function badge(el, text, cls) { el.textContent = text; el.className = el.className.replace(/\b(ok|bad|run)\b/g, "").trim() + (cls ? ` ${cls}` : ""); }
+function badge(el, text, cls) { el.textContent = text; el.className = el.className.replace(/\b(ok|bad|run|warn)\b/g, "").trim() + (cls ? ` ${cls}` : ""); }
 const secs = (ms) => `${(ms / 1000).toFixed(1)}s`;
 
 function startLaneClock(lane, at) {
@@ -201,7 +207,7 @@ function paintLaneResult(lane, r) {
     badge(lane.status, `done${r.attempts > 1 ? ` (retry)` : ""}`, "ok");
     lane.body.set(r.answer || "");
   } else {
-    badge(lane.status, "failed", "bad");
+    badge(lane.status, r.error === "aborted" ? "stopped" : "failed", r.error === "aborted" ? "" : "bad");
     lane.body.set("");
     const e = document.createElement("div");
     e.className = "error-text";
@@ -218,8 +224,9 @@ function paintAnalysis(view, analysis, letterMap) {
     return `<h4>${title}</h4><ul>${items.map((i) => `<li>${fmt(i)}</li>`).join("")}</ul>`;
   };
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  // Replace candidate letters ("A", "B"...) in prose with model names where a map exists.
-  const deanon = (s) => esc(s).replace(/\b([A-H])\b/g, (m, l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(labelOf(letterMap[l]))}</span>` : m));
+  // The synthesizer is told to write "candidate X"; only that phrase is de-anonymized, so a bare
+  // "B" in ordinary prose (vitamin B, plan B) is left alone.
+  const deanon = (s) => esc(s).replace(/\bcandidates? ([A-H])\b/gi, (m, l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(labelOf(letterMap[l]))}</span>` : m));
   view.analysisBody.innerHTML =
     section("Consensus", analysis.consensus, deanon) +
     section("Contradictions", analysis.contradictions, deanon) +
@@ -240,8 +247,11 @@ function paintFinishedTurn(view, t) {
   if (t.status === "done") {
     view.answer.set(t.answer || "");
     if (t.synth_provider) { badge(view.synthBadge, `Fused by ${labelOf(t.synth_provider)}`, "ok"); view.synthMeta.textContent = t.synth_ms ? secs(t.synth_ms) : ""; }
+    else if (t.answer_provider && t.lanes.filter((l) => l.status === "done").length > 1) badge(view.synthBadge, `Unfused: ${labelOf(t.answer_provider)}`, "warn");
     else badge(view.synthBadge, "Single answer", "ok");
     paintAnalysis(view, t.analysis, t.letter_map);
+  } else if (t.status === "cancelled") {
+    badge(view.synthBadge, "Stopped", "");
   } else {
     badge(view.synthBadge, "Failed", "bad");
     view.synthMeta.textContent = t.error || "";
@@ -251,13 +261,26 @@ function paintFinishedTurn(view, t) {
 
 function followTurn(turnId, view) {
   return new Promise((resolve) => {
+    // On a dropped connection EventSource reconnects with Last-Event-ID and the server resumes
+    // after it, so appending deltas here is safe across reconnects.
     const es = new EventSource(`/api/turns/${turnId}/events`);
     const box = $("#turns");
     const nearBottom = () => box.scrollHeight - box.scrollTop - box.clientHeight < 160;
     let stick = true;
-    box.addEventListener("scroll", () => { stick = nearBottom(); }, { passive: true });
+    const onScroll = () => { stick = nearBottom(); };
+    box.addEventListener("scroll", onScroll, { passive: true });
     const keep = () => { if (stick) box.scrollTop = box.scrollHeight; };
-    const finish = () => { es.close(); view.answerEl.classList.remove("cursor"); resolve(); };
+    let lastError = "";
+    let terminal = false; // a cancelled/fatal/failed badge was already painted
+    state.followingTurnId = turnId;
+    const finish = () => {
+      es.close();
+      box.removeEventListener("scroll", onScroll);
+      view.answerEl.classList.remove("cursor");
+      for (const lane of Object.values(view.lanes)) clearInterval(lane.timer);
+      if (state.followingTurnId === turnId) state.followingTurnId = null;
+      resolve();
+    };
     badge(view.synthBadge, "Waiting for models…", "run");
 
     es.addEventListener("lane", (e) => {
@@ -265,17 +288,22 @@ function followTurn(turnId, view) {
       const lane = view.lanes[ev.provider];
       if (!lane) return;
       if (ev.status === "queued") badge(lane.status, "queued", "");
-      else if (ev.status === "running") { badge(lane.status, ev.attempt > 1 ? `retrying` : "running", "run"); startLaneClock(lane, ev.at); }
+      else if (ev.status === "running") { badge(lane.status, ev.attempt > 1 ? `retrying` : "running", "run"); startLaneClock(lane, ev.at); if (ev.attempt > 1) lane.body.set(""); }
       else if (ev.status === "delta") lane.body.append(ev.text);
       else paintLaneResult(lane, ev.result);
       keep();
     });
     es.addEventListener("synth", (e) => {
       const ev = JSON.parse(e.data);
-      if (ev.status === "start") { badge(view.synthBadge, `${ev.fallback ? "Fallback: " : ""}Fusing with ${labelOf(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
+      if (ev.status === "start") { view.answer.set(""); badge(view.synthBadge, `${ev.fallback ? "Fallback: " : ""}Fusing with ${labelOf(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
       else if (ev.status === "delta") { view.answer.append(ev.text); }
       else if (ev.status === "done") { view.answer.set(ev.result.answer); badge(view.synthBadge, `Fused by ${labelOf(ev.result.provider)}`, "ok"); view.synthMeta.textContent = secs(ev.result.ms); paintAnalysis(view, ev.result.analysis, ev.result.letterMap); view.answerEl.classList.remove("cursor"); }
-      else if (ev.status === "skipped") { badge(view.synthBadge, ev.reason === "all lanes failed" ? "Failed" : "Single answer", ev.reason === "all lanes failed" ? "bad" : "ok"); }
+      else if (ev.status === "skipped") {
+        view.answerEl.classList.remove("cursor");
+        if (ev.reason === "all lanes failed") { badge(view.synthBadge, "Failed", "bad"); terminal = true; }
+        else if (ev.reason === "synthesis failed") { view.answer.set(""); badge(view.synthBadge, `Unfused: ${labelOf(ev.provider)}`, "warn"); view.synthMeta.textContent = "every synthesizer failed; showing one model's answer"; }
+        else badge(view.synthBadge, "Single answer", "ok");
+      }
       keep();
     });
     es.addEventListener("history", (e) => {
@@ -283,16 +311,18 @@ function followTurn(turnId, view) {
       if (ev.omitted > 0) view.synthMeta.textContent = `earliest ${ev.omitted} turn(s) omitted from context`;
     });
     es.addEventListener("error", (e) => {
-      if (e.data) { const ev = JSON.parse(e.data); $("#composer-note").textContent = ev.message; }
+      if (e.data) { const ev = JSON.parse(e.data); lastError = ev.message; $("#composer-note").textContent = ev.message; }
     });
+    es.addEventListener("cancelled", () => { terminal = true; badge(view.synthBadge, "Stopped", ""); view.synthMeta.textContent = ""; view.answer.set(""); });
     es.addEventListener("finished", (e) => {
       const ev = JSON.parse(e.data);
       if (ev.answer && !view.answer.text) view.answer.set(ev.answer);
       if (ev.persisted) api(`/api/turns/${turnId}`).then((t) => paintFinishedTurn(view, t));
+      else if (!ev.answer && !terminal) { badge(view.synthBadge, "Failed", "bad"); view.synthMeta.textContent = lastError; view.answer.set(""); }
       finish();
     });
-    es.addEventListener("fatal", (e) => { const ev = JSON.parse(e.data); badge(view.synthBadge, "Failed", "bad"); view.synthMeta.textContent = ev.message; finish(); });
-    es.onerror = () => { /* EventSource auto-reconnects; the server replays buffered events */ };
+    es.addEventListener("fatal", (e) => { const ev = JSON.parse(e.data); terminal = true; badge(view.synthBadge, "Failed", "bad"); view.synthMeta.textContent = ev.message; finish(); });
+    es.onerror = () => { /* EventSource auto-reconnects with Last-Event-ID; the server resumes from there */ };
   });
 }
 
@@ -308,11 +338,19 @@ async function ask() {
   }
   setBusy(true);
   $("#composer-note").textContent = "";
+  let turnId;
+  try {
+    ({ turnId } = await api(`/api/conversations/${state.current.id}/ask`, { method: "POST", body: JSON.stringify({ question: q, providers }) }));
+  } catch (err) {
+    // Refused (e.g. a turn is still running here): keep the text so nothing is lost.
+    $("#composer-note").textContent = err.message;
+    setBusy(false);
+    return;
+  }
   $("#question").value = "";
   const view = mountTurn(q, providers);
   $("#turns").scrollTop = $("#turns").scrollHeight;
   try {
-    const { turnId } = await api(`/api/conversations/${state.current.id}/ask`, { method: "POST", body: JSON.stringify({ question: q, providers }) });
     await loadConversations();
     const conv = state.conversations.find((c) => c.id === state.current.id);
     if (conv) $("#conv-title").textContent = conv.title;
@@ -327,6 +365,12 @@ async function ask() {
   }
 }
 $("#send").addEventListener("click", ask);
+$("#stop").addEventListener("click", async () => {
+  if (!state.followingTurnId) return;
+  $("#stop").disabled = true;
+  try { await api(`/api/turns/${state.followingTurnId}/cancel`, { method: "POST" }); } catch (err) { $("#composer-note").textContent = err.message; }
+  finally { $("#stop").disabled = false; }
+});
 $("#question").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(); }
 });

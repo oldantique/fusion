@@ -38,6 +38,7 @@ body {
 button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); border-radius: 8px; padding: 6px 12px; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
 button.primary:disabled { opacity: 0.5; cursor: default; }
+button.danger { border-color: var(--bad); color: var(--bad); }
 button.link { background: none; border: none; color: var(--fg-2); padding: 4px 0; }
 button.icon { padding: 4px 8px; }
 input, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
@@ -48,6 +49,7 @@ textarea { resize: vertical; width: 100%; }
 .badge.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .badge.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
 .badge.run { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.badge.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 
 /* login */
 .login { height: 100%; display: grid; place-items: center; }
