@@ -80,6 +80,7 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 - Reachable on the LAN/Tailscale by design; the only protection is the shared password and a
   signed, expiring cookie. Use a strong password; rotate the cookie secret to log everyone out.
 - No TLS. Don't port-forward to the public internet; use Tailscale for remote access.
-- Lanes are told they have no tools and are spawned from an empty directory, but this is prompt
-  + no-write, not containment (see `docs/DESIGN.md`): a lane could read files on this machine.
-  Fine for one owner's box; another reason not to expose the UI to anyone else.
+- Lanes are spawned from an empty directory; claude and kimi run with an empty tool set, codex
+  and grok with writes and shell denied — but that is no-write, not containment (see
+  `docs/DESIGN.md`): codex and grok could still read files on this machine. Fine for one
+  owner's box; another reason not to expose the UI to anyone else.

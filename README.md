@@ -5,8 +5,10 @@ already pay for**, no API keys.
 
 Fusion fans a question out in parallel to the locally installed `claude`, `codex`, `kimi` and
 `grok` CLIs (each logged in with its normal subscription), then has Claude Opus merge the
-answers into one Markdown response and explain where the models disagreed. It runs as a small
-local web app; opening it to your LAN or Tailscale network is a one-line opt-in in `.env`.
+answers into one Markdown response and explain where the models disagreed. Every model answers
+offline — no web search or browsing — so answers reflect training knowledge, not the live web
+(why: `docs/DESIGN.md`). It runs as a small local web app; opening it to your LAN or Tailscale
+network is a one-line opt-in in `.env`.
 
 ```
                  ┌─ claude ─────┐

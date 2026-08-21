@@ -6,7 +6,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | # | Thread | State | Notes |
 |---|---|---|---|
 | 1 | Selectable synthesizer (UI dropdown) | OPEN | v1 fixed to Claude; needs answer-only fallback UX for non-schema providers |
-| 2 | "Allow web search" toggle per question | OPEN | Per-CLI flags differ; kimi has no off switch other than prompt |
+| 2 | "Allow web search" toggle per question | OPEN | Since 2026-08-21 every lane is offline by a hard flag (kimi via `--agent-file`, see `docs/DESIGN.md`); the toggle must open all four together |
 | 3 | Per-lane retry button | OPEN | Backend retries transient failures once automatically |
 | 4 | History summarization when budget exceeded | OPEN | Currently oldest turns are dropped |
 | 5 | codex via `app-server` daemon (token streaming, no cold start) | OPEN | Experimental API; unverified |
@@ -17,7 +17,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 12 | `Synthesizer` strategy + child table for synthesis attempts | OPEN | v2; today synthesis is a side capability of a panel provider (`supportsJsonSchema`) |
 | 13 | Versioned SQLite migrations | OPEN | v2; today: `CREATE IF NOT EXISTS` + idempotent `ALTER TABLE` in `src/store/db.ts` |
 | 14 | "Unfused" answer: confirm or re-synthesise before it is replayed as history | OPEN | v2; today it enters history like any answer (consistency argument in `docs/DESIGN.md`) — a "Retry synthesis" button is the likely shape |
-| 15 | Run the service and the CLIs under a dedicated OS account | OPEN | v2, ops; the only real containment available while kimi has no permission gate — needs each CLI's auth moved to that account |
+| 15 | Run the service and the CLIs under a dedicated OS account | OPEN | v2, ops; the only real containment: claude and kimi run with no tools, but codex (read-only sandbox) and grok (deny rules) can still read this machine — needs each CLI's auth moved to that account |
 
 ## Archive
 
