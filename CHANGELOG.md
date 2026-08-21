@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fenced code blocks carry a header with the language and a Copy button.
+- Copy any answer as Markdown — the fused header and every lane's summary row.
+- ```mermaid fences are drawn as diagrams (lazy-loaded bundle, source one click away, a
+  diagram that will not parse keeps showing its code).
+- Chemistry notation: KaTeX now loads mhchem, so `\ce{H2O}` and `\pu{…}` render.
+- Footnotes (`[^1]`) render as a footnotes section instead of literal text; ids are scoped per
+  answer so backlinks stay inside their own turn.
 - LaTeX in answers is rendered with KaTeX (bundled, no CDN): `$$…$$` / `\[…\]` display and
   `$…$` / `\(…\)` inline, extracted before markdown so code blocks and prices like $5 are
   untouched and half-streamed math stays literal text.
