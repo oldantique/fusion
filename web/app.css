@@ -110,6 +110,15 @@ textarea { resize: vertical; width: 100%; }
 .md > :first-child { margin-top: 0; }
 .md > :last-child { margin-bottom: 0; }
 .md pre { background: var(--bg-3); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
+/* Fenced blocks carry a header strip: language on the left, Copy on the right. The <pre> keeps
+   its own background so highlight.js themes still apply; the wrapper only clips the corners. */
+.md .code-block { margin: 1em 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.md .code-block > pre { margin: 0; border-radius: 0; }
+.code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 10px; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+.code-lang { font-family: var(--mono); font-size: 11px; color: var(--fg-2); letter-spacing: .03em; }
+.code-copy, .copy-md { font-size: 11px; line-height: 1.5; padding: 1px 8px; border-radius: 6px; border: 1px solid transparent; background: none; color: var(--fg-2); }
+.code-copy:hover, .copy-md:hover { color: var(--fg); border-color: var(--line); background: var(--bg-3); }
+.code-copy.done, .copy-md.done { color: var(--ok); border-color: transparent; background: none; }
 .md code { font-family: var(--mono); font-size: 0.92em; }
 .md :not(pre) > code { background: var(--bg-3); padding: 1px 5px; border-radius: 5px; }
 .md table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }

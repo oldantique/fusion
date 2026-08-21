@@ -19,6 +19,53 @@ function setMarkdown(el, md) {
     try { hljs.highlightElement(b); } catch {}
   });
   el.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
+  enhanceCodeBlocks(el);
+}
+
+/**
+ * Give every fenced block the header ChatGPT has: the language on the left, a Copy button on the
+ * right. Answers are re-rendered from scratch on every delta, so this runs inside setMarkdown
+ * rather than once at mount — and the click itself is delegated from `#turns`, so the buttons a
+ * re-render throws away never leave a listener behind. The language is read *after* highlighting
+ * because hljs is what labels an unfenced block it auto-detected.
+ */
+function enhanceCodeBlocks(el) {
+  el.querySelectorAll("pre > code").forEach((code) => {
+    const pre = code.parentElement;
+    if (pre.parentElement?.classList.contains("code-block")) return;
+    const box = document.createElement("div");
+    box.className = "code-block";
+    const head = document.createElement("div");
+    head.className = "code-head";
+    const lang = document.createElement("span");
+    lang.className = "code-lang";
+    lang.textContent = /\blanguage-([\w+#-]+)/.exec(code.className)?.[1] ?? "";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "code-copy";
+    copy.textContent = "Copy";
+    copy.title = "Copy code";
+    head.append(lang, copy);
+    pre.replaceWith(box);
+    box.append(head, pre);
+  });
+}
+
+/** Copy `text` and say so on the button for a moment. */
+const copyTimers = new WeakMap();
+async function copyFrom(btn, text) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    return; // no clipboard permission (or an insecure origin): leave the button alone
+  }
+  const label = btn.dataset.label ?? btn.textContent;
+  btn.dataset.label = label;
+  btn.textContent = "Copied";
+  btn.classList.add("done");
+  clearTimeout(copyTimers.get(btn));
+  copyTimers.set(btn, setTimeout(() => { btn.textContent = label; btn.classList.remove("done"); }, 1500));
 }
 /** Throttled markdown re-render for streaming text. */
 function streamer(el) {
@@ -170,6 +217,16 @@ function pickedProviders() {
 
 // ---------- turns ----------
 function labelOf(id) { return state.providers.find((p) => p.id === id)?.label ?? id; }
+
+// One delegated handler for every copy button in the transcript: the ones inside answers are
+// recreated on every streamed delta, so they must not own their own listeners.
+$("#turns").addEventListener("click", (e) => {
+  const btn = e.target.closest?.("button");
+  if (!btn) return;
+  if (btn.classList.contains("code-copy")) {
+    copyFrom(btn, btn.closest(".code-block")?.querySelector("code")?.textContent ?? "");
+  }
+});
 
 function mountTurn(question, providerIds) {
   const node = $("#turn-tpl").content.firstElementChild.cloneNode(true);
