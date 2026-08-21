@@ -20,15 +20,22 @@ function render(md) {
  */
 const mdSource = new WeakMap();
 
-function setMarkdown(el, md) {
+/**
+ * @param {Element} el
+ * @param {string} md
+ * @param {boolean} final whether `md` is the complete text (as opposed to a streaming prefix);
+ *   only then is it worth handing diagrams to mermaid, which cannot parse a half-arrived fence.
+ */
+function setMarkdown(el, md, final = false) {
   mdSource.set(el, md ?? "");
   el.closest(".fused, .lane")?.querySelector(".copy-md")?.classList.toggle("hidden", !md);
   el.innerHTML = render(md);
-  el.querySelectorAll("pre code").forEach((b) => {
+  el.querySelectorAll("pre code:not(.language-mermaid)").forEach((b) => {
     try { hljs.highlightElement(b); } catch {}
   });
   el.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
   enhanceCodeBlocks(el);
+  if (final) renderDiagrams(el);
 }
 
 /**
@@ -87,9 +94,73 @@ function streamer(el) {
       scheduled = true;
       requestAnimationFrame(() => { scheduled = false; setMarkdown(el, text); });
     },
-    set(t) { text = t; setMarkdown(el, text); },
+    set(t) { text = t; setMarkdown(el, text, true); },
     get text() { return text; },
   };
+}
+
+// ---------- mermaid ----------
+/**
+ * Diagrams are drawn only for *finished* text. During streaming every delta re-renders the
+ * answer, and a fence that has only half arrived is a parse error, so attempting it per delta
+ * would mean a diagram that flickers between an error and a picture for as long as the model is
+ * writing. Waiting for the lane (or the synthesizer) to finish costs nothing visually — the code
+ * is on screen the whole time — and one pass also covers turns painted from the database on
+ * reload, which take the same `set()` path.
+ */
+let mermaidReady = null;
+function loadMermaid() {
+  // ~7x the size of everything else in web/vendor put together, and most answers have no
+  // diagram: it is a separate bundle, fetched the first time one appears and then cached.
+  mermaidReady ??= import("/vendor/mermaid.js").then(({ default: mermaid }) => {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      // DOMPurify's SVG profile has no <foreignObject>, and widening it would let arbitrary
+      // HTML back into an answer we just sanitized. `htmlLabels: false` makes mermaid lay out
+      // labels with <text>, which the strict profile keeps — so the profile can stay strict.
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default",
+    });
+    return mermaid;
+  });
+  return mermaidReady;
+}
+
+let diagramSeq = 0;
+async function renderDiagrams(root) {
+  const blocks = [...root.querySelectorAll("pre > code.language-mermaid")];
+  if (blocks.length === 0) return;
+  let mermaid;
+  try {
+    mermaid = await loadMermaid();
+  } catch {
+    return; // bundle missing: the fence stays a readable code block
+  }
+  for (const code of blocks) {
+    const box = code.closest(".code-block");
+    if (!box || !box.isConnected) continue; // a later render already replaced this subtree
+    let svg;
+    try {
+      ({ svg } = await mermaid.render(`mermaid-${++diagramSeq}`, code.textContent));
+    } catch {
+      // A syntax error must leave the source on screen — never a blank space where a picture was.
+      box.querySelector(".code-lang").textContent = "mermaid · could not be drawn";
+      continue;
+    }
+    if (!box.isConnected) continue;
+    const fig = document.createElement("div");
+    fig.className = "mermaid-svg";
+    fig.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "mermaid-toggle";
+    toggle.textContent = "Code";
+    box.classList.add("mermaid-block");
+    box.querySelector(".code-head").insertBefore(toggle, box.querySelector(".code-copy"));
+    box.append(fig);
+  }
 }
 
 // ---------- api ----------
@@ -234,6 +305,9 @@ $("#turns").addEventListener("click", (e) => {
   if (!btn) return;
   if (btn.classList.contains("code-copy")) {
     copyFrom(btn, btn.closest(".code-block")?.querySelector("code")?.textContent ?? "");
+  } else if (btn.classList.contains("mermaid-toggle")) {
+    const box = btn.closest(".code-block");
+    btn.textContent = box.classList.toggle("show-source") ? "Diagram" : "Code";
   } else if (btn.classList.contains("copy-md")) {
     // A lane's button sits inside its <summary>: without this the copy would also collapse
     // the very answer it just copied.

@@ -23,6 +23,24 @@ await build({
   outfile: path.join(outdir, "bundle.js"),
   logLevel: "info",
 });
+// mermaid is an order of magnitude larger than everything else here put together, and most
+// answers contain no diagram at all — so it gets its own ESM file that app.js import()s the
+// first time a `mermaid` fence shows up, instead of riding along in the main bundle.
+fs.writeFileSync(path.join(outdir, "mermaid-entry.js"), `export { default } from "mermaid";\n`);
+await build({
+  entryPoints: [path.join(outdir, "mermaid-entry.js")],
+  bundle: true,
+  format: "esm",
+  minify: true,
+  // mermaid dynamically import()s each diagram type; without splitting esbuild inlines those
+  // into the one file, which is what we want (a lazy chunk of a lazy chunk buys nothing).
+  splitting: false,
+  define: { "process.env.NODE_ENV": '"production"' },
+  outfile: path.join(outdir, "mermaid.js"),
+  logLevel: "info",
+});
+fs.unlinkSync(path.join(outdir, "mermaid-entry.js"));
+
 for (const f of ["github.min.css", "github-dark.min.css"]) {
   fs.copyFileSync(path.join(root, "node_modules", "highlight.js", "styles", f), path.join(outdir, f));
 }
