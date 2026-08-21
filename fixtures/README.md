@@ -15,3 +15,7 @@ for `--system-prompt-override` and `--disallowed-tools`).
 
 When a CLI upgrade changes its output, capture a new file with the flags from
 `src/providers/index.ts`, add a row above, and adjust the parser + tests. Do not edit old captures.
+
+`npm run check-updates` reads the versions above and tells you when an installed CLI is newer than
+anything this table records; `--help-diff` diffs each CLI's `--help` against the committed
+baselines in `fixtures/help/`, which is how a *new* flag becomes visible.

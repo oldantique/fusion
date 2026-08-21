@@ -188,3 +188,18 @@ with the strict SVG profile. Diagrams are drawn only from finished text (a half-
 cannot parse); a diagram that fails keeps its code visible. The pure extraction step lives in
 `web/math.js` so it can be unit-tested without a browser.
 
+
+## 2026-08-21 — Version drift is tracked against the fixtures, not against a tag
+
+A CLI that self-updates invalidates the parsers and the CLAUDE.md premises without saying so, and
+a check that only asks "is an upgrade available?" cannot see it. `npm run check-updates` therefore
+compares three numbers — the newest version `fixtures/README.md` records, what is installed, and
+what upstream publishes — and treats *installed newer than verified* as the real finding; being
+behind upstream is informational. It exits non-zero only under `--strict`, so it is cheap to run.
+
+Rejected: a `verified-versions.txt` baseline file and `verified/<cli>/<version>` git tags (the
+shape the sibling `~/others/opencode` sweep uses). Both are a second home for a fact
+`fixtures/README.md` already owns, and a second home is a second thing to drift; there is nothing
+to "mark" here because adding a fixtures row *is* the marking. Version comparison is also blind to
+a capability that appeared, so `--help-diff` keeps a committed per-CLI baseline of each
+`--help` under `fixtures/help/` — that diff is the only mechanical way a new flag becomes visible.

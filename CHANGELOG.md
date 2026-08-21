@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `npm run check-updates`: three columns per CLI (last-verified / installed / latest) so an
+  upgrade that silently invalidated the fixtures is visible; `--help-diff` diffs each `--help`
+  against a committed baseline, which is the only way a *new* flag shows up.
 - Fenced code blocks carry a header with the language and a Copy button.
 - Copy any answer as Markdown — the fused header and every lane's summary row.
 - ```mermaid fences are drawn as diagrams (lazy-loaded bundle, source one click away, a

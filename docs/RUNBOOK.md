@@ -37,7 +37,10 @@ hand and noted in `CHANGELOG.md`.
 
 ### After upgrading one of the CLIs
 
-`npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` with the flags in
+`npm run check-updates` first: it flags any CLI whose installed build is newer than the versions
+`fixtures/README.md` records, and `--help-diff` shows the flags that appeared since the committed
+`fixtures/help/` baselines (`--help-diff --update` re-baselines once you have re-verified).
+Then `npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` with the flags in
 `src/providers/index.ts` and compare its output to `fixtures/`. If the format changed: capture a
 new fixture, record the version in `fixtures/README.md`, adjust the parser, add a test.
 

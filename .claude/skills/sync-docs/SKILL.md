@@ -45,9 +45,10 @@ file exactly once. No test reaches memory; check its paths by hand.
   RUNBOOK failure-mode row and the newest DESIGN entry that describes that behaviour; a sentence
   that now contradicts the code is deleted or corrected, not annotated. Gotchas stay one-line
   claim + pointer.
-- `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run doctor` shows
-  versions), `npm run smoke` must pass; a changed output format means a new fixture, a new row
-  in `fixtures/README.md`, and parser + test updates in the same commit. Premises that a CLI
+- `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run check-updates` lists
+  installed-but-unverified CLIs and `--help-diff` shows new flags), `npm run smoke` must pass; a
+  changed output format means a new fixture, a new row in `fixtures/README.md`, and parser + test
+  updates in the same commit. Premises that a CLI
   upgrade can invalidate (no token deltas from codex/kimi; claude's Chinese default; grok's
   ignored `--disallowed-tools`) are re-tested, not assumed.
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads

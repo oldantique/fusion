@@ -50,7 +50,8 @@ work and before compacting.
 
 See the `scripts` block in `package.json`; the ones you will want: `doctor` (CLIs installed and
 logged in), `smoke` (one trivial call per provider with timing), `fuse -- "question"` (a full
-turn in the terminal), `test`, `typecheck`, `check-docs`, `dev`.
+turn in the terminal), `check-updates` (installed CLIs vs the versions the fixtures were verified
+against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `check-docs`, `dev`.
 
 ## Gotchas (corrected mistakes — do not relearn)
 
