@@ -70,8 +70,9 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   not every tool name is a valid prefix (the CLI rejects unknown ones at startup). Its
   `streaming-messages-json` is wire-compatible with claude's stream. `--system-prompt-override`
   defeats the prompt cache.
-- **kimi** has no permission gate in `-p` mode (it can read and write anywhere; the prompt is the
-  only barrier) and no effort flag (global config only). It is a
+- **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
+  `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
+  Bash/Edit/WebSearch and can read and write anywhere. No effort flag (global config only). It is a
   Node binary and needs the IPv4-fallback option that `childEnv()` appends; without it every call
   fails with an OAuth "fetch failed" on this host (interactive shells get it from `.bashrc`).
 - `claude --json-schema` output streams as `input_json_delta` fragments; the final object is in

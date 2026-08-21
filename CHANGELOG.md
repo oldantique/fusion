@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- kimi runs with an empty tool set (`--agent-file`); it can no longer search the web or touch
+  files, matching the other lanes.
 - `npm run check-updates`: three columns per CLI (last-verified / installed / latest) so an
   upgrade that silently invalidated the fixtures is visible; `--help-diff` diffs each `--help`
   against a committed baseline, which is the only way a *new* flag shows up.

@@ -11,6 +11,9 @@ import { PROVIDER_LABELS } from "../types.ts";
 import { cliProvider } from "./base.ts";
 
 /** Providers without a system-prompt flag get it prepended to the user prompt. */
+/** Agent definition that strips kimi's tool set; see the kimi provider below. */
+const KIMI_AGENT_FILE = new URL("./kimi-agent.md", import.meta.url).pathname;
+
 function inlineSystem(opts: CallOptions): string {
   return `${opts.system}\n\n---\n\n${opts.prompt}`;
 }
@@ -84,9 +87,13 @@ export const kimi: Provider = cliProvider({
   build(opts) {
     // Effort lives in ~/.kimi-code/config.toml ([thinking] effort); k3 defaults to high.
     // There is no per-call flag, so opts.effort cannot be honoured here.
+    // `-p` has no permission gate and no tool flag: by default the model gets the full tool set
+    // (Bash, Edit, WebSearch, …). The only hard switch is an agent definition whose frontmatter
+    // says `tools: []` — the request then carries an empty tool list (verified in the CLI's
+    // wire log), which puts kimi on the same footing as the other lanes: knowledge only.
     return {
       cmd: "kimi",
-      args: ["-m", config.models.kimi, "--output-format", "stream-json", "-p", inlineSystem(opts)],
+      args: ["--agent-file", KIMI_AGENT_FILE, "-m", config.models.kimi, "--output-format", "stream-json", "-p", inlineSystem(opts)],
     };
   },
   parser: () => createKimiParser(),

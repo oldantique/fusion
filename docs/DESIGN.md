@@ -216,3 +216,15 @@ three (two for the preferred, one for a fallback), superseding the cap in the 20
 review round" entry. The `synth start` event now carries `retry` next to `fallback` so the UI
 can say which is happening.
 
+### 2026-08-21 — Panel lanes are offline by design, and kimi now is too
+
+The panel answers from model knowledge: claude runs with an empty tool list, grok with web search
+disabled and its write/shell tools denied, codex without `--search` in a read-only sandbox. Kimi
+was the exception — `-p` mode has no tool flag and shipped the full tool set, including web search
+and unrestricted file access, with the prompt as the only barrier. An agent definition passed via
+`--agent-file` whose frontmatter says `tools: []` turns out to be a hard switch: the request the
+CLI sends carries an empty tool list (checked in its wire log), so the model cannot call anything.
+`src/providers/kimi-agent.md` is that file. The consequence is uniform: no lane can browse, so a
+question that needs today's facts gets four answers from training data; if that is ever wanted, it
+should be one switch that opens all four lanes together, not kimi drifting on its own.
+
