@@ -116,6 +116,10 @@ textarea { resize: vertical; width: 100%; }
 .md th, .md td { border: 1px solid var(--line); padding: 4px 10px; }
 .md blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--fg-2); }
 .md img { max-width: 100%; }
+/* KaTeX inherits `color`, so the dark palette needs no override; a wide display equation gets
+   its own scroller instead of stretching the answer column. */
+.md .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.md .katex { font-size: 1.05em; }
 
 @media (max-width: 760px) {
   .app, .app.collapsed { grid-template-columns: minmax(0, 1fr); }

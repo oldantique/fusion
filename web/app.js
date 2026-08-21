@@ -1,10 +1,17 @@
-import { marked, DOMPurify, hljs } from "/vendor/bundle.js";
+import { marked, DOMPurify, hljs, katex } from "/vendor/bundle.js";
+import { splitMath, restoreMath } from "./math.js";
 
 // ---------- markdown ----------
 marked.setOptions({ gfm: true, breaks: false });
+const renderTex = (tex, displayMode) =>
+  katex.renderToString(tex, { displayMode, throwOnError: false, output: "html" });
 function render(md) {
-  const html = marked.parse(md ?? "");
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  // Math is lifted out before marked (which would eat the backslashes and underscores) and put
+  // back after DOMPurify — the markup that skips the sanitizer is only ever KaTeX's own output
+  // for the extracted TeX, and `throwOnError: false` makes bad TeX render as red text.
+  const { text, blocks } = splitMath(md ?? "");
+  const html = DOMPurify.sanitize(marked.parse(text), { USE_PROFILES: { html: true } });
+  return restoreMath(html, blocks, renderTex);
 }
 function setMarkdown(el, md) {
   el.innerHTML = render(md);

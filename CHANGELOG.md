@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- LaTeX in answers is rendered with KaTeX (bundled, no CDN): `$$…$$` / `\[…\]` display and
+  `$…$` / `\(…\)` inline, extracted before markdown so code blocks and prices like $5 are
+  untouched and half-streamed math stays literal text.
 - Docs restructured around single-home facts: `.env.example` owns configuration,
   `fixtures/README.md` owns verified CLI versions, `docs/DESIGN.md` is a dated decision record,
   `docs/THREADS.md` tracks open work. `npm run check-docs` (part of `npm test`) verifies that
