@@ -13,7 +13,16 @@ function render(md) {
   const html = DOMPurify.sanitize(marked.parse(text), { USE_PROFILES: { html: true } });
   return restoreMath(html, blocks, renderTex);
 }
+/**
+ * The Markdown a rendered `.md` container was built from — what the Copy button hands over.
+ * Copying the rendered HTML instead would give the reader KaTeX spans and highlighter markup;
+ * what they want back is the source they could paste into another chat.
+ */
+const mdSource = new WeakMap();
+
 function setMarkdown(el, md) {
+  mdSource.set(el, md ?? "");
+  el.closest(".fused, .lane")?.querySelector(".copy-md")?.classList.toggle("hidden", !md);
   el.innerHTML = render(md);
   el.querySelectorAll("pre code").forEach((b) => {
     try { hljs.highlightElement(b); } catch {}
@@ -225,6 +234,12 @@ $("#turns").addEventListener("click", (e) => {
   if (!btn) return;
   if (btn.classList.contains("code-copy")) {
     copyFrom(btn, btn.closest(".code-block")?.querySelector("code")?.textContent ?? "");
+  } else if (btn.classList.contains("copy-md")) {
+    // A lane's button sits inside its <summary>: without this the copy would also collapse
+    // the very answer it just copied.
+    e.preventDefault();
+    e.stopPropagation();
+    copyFrom(btn, mdSource.get(btn.closest(".fused, .lane")?.querySelector(".md")) ?? "");
   }
 });
 
