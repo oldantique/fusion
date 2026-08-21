@@ -49,7 +49,8 @@ work and before compacting.
 ## Useful commands
 
 See the `scripts` block in `package.json`; the ones you will want: `doctor` (CLIs installed and
-logged in), `smoke` (one trivial call per provider with timing), `fuse -- "question"` (a full
+logged in, bwrap works), `smoke` (one trivial call per provider with timing), `canary` (no lane
+can read a planted file), `fuse -- "question"` (a full
 turn in the terminal), `check-updates` (installed CLIs vs the versions the fixtures were verified
 against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `check-docs`, `dev`.
 
@@ -59,6 +60,9 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   `childEnv()` and the `cwd` default in `src/providers/process.ts`. Grok and kimi read the cwd's
   agent files as system prompt, and a parent Claude Code session leaks env vars that change
   child behaviour.
+- **All CLIs run inside a bwrap jail** (`jailArgv` in `src/providers/process.ts`); each provider's
+  `mounts` list in `src/providers/index.ts` is the allowlist; `npm run canary` proves no lane can
+  read a file outside it. The tool blocks below are the second layer, not the containment.
 - **Never pass `--bare` to claude** — it disables OAuth and would demand an API key.
 - **claude on this account answers in Chinese by default** (account-level preference injected
   by the CLI; no flag disables it). Only the emphatic language line in `src/synth/prompts.ts`
@@ -67,7 +71,8 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   cache and costs more — keep the default tool set. It is the slowest lane and its concurrency
   cap defaults to one (OpenAI asks that one `auth.json` not be shared across concurrent jobs).
 - **grok** ignores `--disallowed-tools`; only effect-scoped `--deny 'Tool(**)'` rules work, and
-  not every tool name is a valid prefix (the CLI rejects unknown ones at startup). Its
+  not every tool name is a valid prefix (the CLI rejects unknown ones at startup; the valid set
+  is the list in its provider definition). Its
   `streaming-messages-json` is wire-compatible with claude's stream. `--system-prompt-override`
   defeats the prompt cache.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the

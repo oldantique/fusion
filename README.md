@@ -20,8 +20,9 @@ question ──┬────►├─ codex ──────┼──► syn
 
 ## Requirements
 
-- Linux/macOS with a Node version that supports `node:sqlite` and type stripping
-  (see `engines` in `package.json`).
+- Linux with a Node version that supports `node:sqlite` and type stripping
+  (see `engines` in `package.json`), and `bubblewrap` (`bwrap`) — every CLI runs inside a jail
+  that hides the rest of your files from it (see `docs/RUNBOOK.md`, Security posture).
 - Any subset of the four CLIs installed and logged in — untick the ones you don't have.
   `npm run doctor` checks.
 

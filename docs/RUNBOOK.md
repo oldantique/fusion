@@ -55,6 +55,8 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | Lane badge says "rate limited" | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI); not retried | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
 | Lane fails with a terse or odd error, usually the same lane every time | Usually the same quota exhaustion, from a CLI whose message does not say so | As above |
 | Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
+| A lane fails after a CLI upgrade with a missing-file / ENOENT / permission error | The new build wants a path the jail does not expose | Bisect with `FUSION_JAIL=off` in `.env` (restart); if the lane works unjailed, add the path to that provider's `mounts` in `src/providers/index.ts`, turn the jail back on, re-run `npm run smoke` and `npm run canary` |
+| Every lane fails at once with "bwrap not found" | bubblewrap missing, or the service's PATH does not include it | `apt install bubblewrap`; `npm run doctor` checks it can create a sandbox on this kernel |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |
 | Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
 | Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
@@ -80,7 +82,10 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 - Reachable on the LAN/Tailscale by design; the only protection is the shared password and a
   signed, expiring cookie. Use a strong password; rotate the cookie secret to log everyone out.
 - No TLS. Don't port-forward to the public internet; use Tailscale for remote access.
-- Lanes are spawned from an empty directory; claude and kimi run with an empty tool set, codex
-  and grok with writes and shell denied — but that is no-write, not containment (see
-  `docs/DESIGN.md`): codex and grok could still read files on this machine. Fine for one
-  owner's box; another reason not to expose the UI to anyone else.
+- Every lane runs inside a bubblewrap jail (`jailArgv` in `src/providers/process.ts`): a fresh
+  mount namespace with a tmpfs HOME that holds only that CLI's own state directory, the OS
+  read-only, and the empty sandbox as cwd. The tool blocks (claude and kimi: no tools; grok:
+  the full deny list; codex: its read-only sandbox) are a second layer on top. `npm run canary`
+  plants a secret under the real HOME and proves no lane can quote it; run it after a CLI
+  upgrade. The CLIs still hold their own OAuth tokens and have network access — the jail
+  contains file access, not the subscription.

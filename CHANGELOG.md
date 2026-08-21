@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Every lane runs inside a bubblewrap jail that exposes only that CLI's own state directory;
+  `npm run canary` proves no lane can read a file planted under HOME. `FUSION_JAIL=off` to
+  bisect a CLI that stopped working after an upgrade. grok also gets the full `--deny` set.
+  bubblewrap is now a prerequisite (`npm run doctor` checks it).
 - UI: a line under the model picks says every model answers offline and lists each one's
   vendor-stated knowledge cutoff (home: `PROVIDER_CUTOFFS` in `src/types.ts`).
 - kimi runs with an empty tool set (`--agent-file`); it can no longer search the web or touch

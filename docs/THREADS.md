@@ -17,10 +17,10 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 12 | `Synthesizer` strategy + child table for synthesis attempts | OPEN | v2; today synthesis is a side capability of a panel provider (`supportsJsonSchema`) |
 | 13 | Versioned SQLite migrations | OPEN | v2; today: `CREATE IF NOT EXISTS` + idempotent `ALTER TABLE` in `src/store/db.ts` |
 | 14 | "Unfused" answer: confirm or re-synthesise before it is replayed as history | OPEN | v2; today it enters history like any answer (consistency argument in `docs/DESIGN.md`) — a "Retry synthesis" button is the likely shape |
-| 15 | Run the service and the CLIs under a dedicated OS account | OPEN | v2, ops; the only real containment: claude and kimi run with no tools, but codex (read-only sandbox) and grok (deny rules) can still read this machine — needs each CLI's auth moved to that account |
 
 ## Archive
 
+- 2026-08-21 — #15 (dedicated OS account) closed: superseded by the bwrap jail — every lane runs in a mount namespace that exposes only its own state dir; `npm run canary` is the proof; rationale in `docs/DESIGN.md`.
 - 2026-08-20 — v0.1.0 built, browser-QA'd (two rounds), tagged.
 - 2026-08-20 — systemd user unit installed and enabled (linger on); four-lane turn verified from the service environment.
 - 2026-08-20 — #8 closed: raw lane answers were in fact streamed since v0.1.0; the row was stale.

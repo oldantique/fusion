@@ -228,3 +228,27 @@ CLI sends carries an empty tool list (checked in its wire log), so the model can
 question that needs today's facts gets four answers from training data; if that is ever wanted, it
 should be one switch that opens all four lanes together, not kimi drifting on its own.
 
+### 2026-08-21 — Every lane runs inside a bubblewrap jail
+
+The tool blocks were never containment. claude (`--tools ""`) and kimi (`tools: []`) hold, but
+codex's `-s read-only` and grok's deny rules only forbid *writes*; a canary file planted under
+HOME came back quoted by both. Three ways to close that: a dedicated OS account (thread #15:
+every CLI's OAuth state moved and re-logged-in, a second user to keep patched, and the service
+still talking to it across the boundary), more CLI flags (each vendor's, each unverified after
+every upgrade, and grok has already shown that not every flag does what it says), or an OS-level
+mount namespace around the spawn. bubblewrap is the third: unprivileged, one binary, and the
+property does not depend on the CLI cooperating. `jailArgv` in `src/providers/process.ts` builds
+it: the OS read-only, the CA bundle and the few `/etc` files needed for DNS and user lookup, the
+CLI's install (resolved from PATH, so an npm upgrade that relocates nothing needs no change), a
+tmpfs HOME with only the provider's declared `mounts` bound into it, a tmpfs `/tmp`, the empty
+sandbox as writable cwd, and a cleared environment with an allowlist. Each provider's mount list
+is the allowlist and lives next to its flags. State dirs stay writable because every CLI rewrites
+its credentials on token refresh; read-only would work today and break on the first rotation.
+`--unshare-pid` + `--die-with-parent` keep the process-group kill semantics: killing bwrap kills
+the namespace. Networking is not namespaced — the lanes need the vendors' APIs — so this is
+containment of the filesystem, not of the subscription. The canary (`npm run canary`) is the
+test of the property itself rather than of the mount list: it plants a secret, asks each lane to
+read it through the real `runLane`, and fails on a quote. `FUSION_JAIL=off` exists to bisect a
+CLI that stops working after an upgrade; a missing `bwrap` fails the lane rather than running it
+unjailed, because silently losing the property is the one outcome the switch must never produce.
+
