@@ -21,11 +21,39 @@ const ok = (text: string): Script => () => [{ type: "done", text }];
 const fail: Script = () => [{ type: "error", message: "exit 1: nope", kind: "exit" }];
 const synthOrPanel = (panel: string, synth: LaneEvent[]): Script => (o) => (o.prompt.includes("<candidate") ? synth : [{ type: "done", text: panel }]);
 
+/** Answers the panel immediately, then hangs on the synthesis prompt until its signal aborts. */
+function hangingSynth(id: ProviderId, panel: string, supportsJsonSchema = false): Provider {
+  return {
+    id,
+    label: id,
+    streams: true,
+    supportsJsonSchema,
+    async *call(opts) {
+      if (!opts.prompt.includes("<candidate")) {
+        yield { type: "done", text: panel };
+        return;
+      }
+      // A real provider has a live child process holding the event loop open; AbortSignal.timeout
+      // timers are unref'd, so without this stand-in they would never fire under node:test.
+      const keepAlive = setInterval(() => {}, 5);
+      try {
+        await new Promise<void>((r) => {
+          if (opts.signal?.aborted) return r();
+          opts.signal?.addEventListener("abort", () => r(), { once: true });
+        });
+      } finally {
+        clearInterval(keepAlive);
+      }
+      yield { type: "error", message: "timed out", kind: "timeout" };
+    },
+  };
+}
+
 async function run(
   providers: Partial<Record<ProviderId, Provider>>,
   ids: ProviderId[],
   signal?: AbortSignal,
-  extraDeps: { synthEffort?: string } = {},
+  extraDeps: { synthEffort?: string; synthTimeoutMs?: number } = {},
 ) {
   const events: FuseEvent[] = [];
   const out = await fuse({ question: "q?", history: [], providerIds: ids, signal, onEvent: (e) => events.push(e) }, { providers, runLane, ...extraDeps });
@@ -111,4 +139,28 @@ test("the synthesizer call carries its own effort; panel lanes carry none", asyn
   assert.equal(out.answer, "synth");
   assert.equal(efforts.panel, undefined, "a panel lane uses the configured default, not an override");
   assert.equal(efforts.synth, "medium");
+});
+
+test("a synthesizer that hangs is cut off, and the fallback gets a full timeout of its own", async () => {
+  const claude = hangingSynth("claude", "c", true);
+  const grok = stub("grok", synthOrPanel("g", [{ type: "done", text: "grok-fused" }]));
+  const t0 = Date.now();
+  const { out, events } = await run({ claude, grok }, ["claude", "grok"], undefined, { synthTimeoutMs: 50 });
+  assert.equal(out.answer, "grok-fused");
+  assert.equal(out.synthesis?.provider, "grok");
+  const starts = events.filter((e): e is Extract<FuseEvent, { status: "start" }> => e.type === "synth" && e.status === "start");
+  assert.deepEqual(starts.map((s) => [s.provider, s.fallback]), [["claude", false], ["grok", true]]);
+  assert.ok(Date.now() - t0 >= 50, "the first synthesizer really ran until its own timeout");
+});
+
+test("the whole synthesizer chain is capped at twice the lane timeout", async () => {
+  const claude = hangingSynth("claude", "claude-raw", true);
+  const grok = hangingSynth("grok", "grok-raw");
+  const t0 = Date.now();
+  const { out } = await run({ claude, grok }, ["claude", "grok"], undefined, { synthTimeoutMs: 50 });
+  const elapsed = Date.now() - t0;
+  assert.equal(out.synthesis, null);
+  assert.equal(out.answer, "claude-raw", "the best raw answer is shown instead");
+  assert.ok(elapsed >= 90, `both attempts ran (${elapsed}ms)`);
+  assert.ok(elapsed < 150, `the chain was capped at 2x, not 3x (${elapsed}ms)`);
 });

@@ -43,8 +43,9 @@ export interface FuseOutput {
 export interface FuseDeps {
   providers: Partial<Record<ProviderId, Provider>>;
   runLane: typeof realRunLane;
-  /** Test injection only; production reads the configured value. */
+  /** Test injection only; production reads the configured values. */
   synthEffort?: string;
+  synthTimeoutMs?: number;
 }
 
 /**
@@ -115,24 +116,28 @@ async function synthesize(
 ): Promise<SynthesisResult | null> {
   const { prompt, letterMap } = synthPrompt(question, rendered, lanes);
   const effort = deps.synthEffort ?? config.synthEffort;
-  // One lane-timeout for the whole chain: the user already waited for the panel; a fallback that
-  // itself takes the full timeout is not worth another one on top.
-  const deadline = AbortSignal.timeout(config.laneTimeoutMs);
-  const chainSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+  const timeoutMs = deps.synthTimeoutMs ?? config.laneTimeoutMs;
+  // Every attempt gets a full lane timeout of its own, so a fallback started late is not handed
+  // the sliver left over by the synthesizer that hung — that sliver would only produce a second
+  // timeout. The chain as a whole is capped at twice the lane timeout, because the user has
+  // already waited for the panel and an unbounded chain of four could triple that wait.
+  const cap = AbortSignal.timeout(2 * timeoutMs);
+  const chainSignal = signal ? AbortSignal.any([signal, cap]) : cap;
   let fallback = false;
   for (const id of SYNTH_ORDER) {
     const provider = deps.providers[id];
     if (!provider) continue;
     if (chainSignal.aborted) break;
     onEvent({ type: "synth", status: "start", provider: id, fallback });
+    const attemptSignal = AbortSignal.any([chainSignal, AbortSignal.timeout(timeoutMs)]);
     const started = Date.now();
     const structured = provider.supportsJsonSchema;
     let lastStructured: unknown;
     const result = await deps.runLane(
       provider,
       structured
-        ? { prompt, system: SYNTH_SYSTEM, jsonSchema: SYNTH_SCHEMA, streamField: "answer", signal: chainSignal, attempts: 1, effort }
-        : { prompt: `${prompt}\n\nWrite only the final merged Markdown answer.`, system: SYNTH_SYSTEM, signal: chainSignal, attempts: 1, effort },
+        ? { prompt, system: SYNTH_SYSTEM, jsonSchema: SYNTH_SCHEMA, streamField: "answer", signal: attemptSignal, attempts: 1, effort }
+        : { prompt: `${prompt}\n\nWrite only the final merged Markdown answer.`, system: SYNTH_SYSTEM, signal: attemptSignal, attempts: 1, effort },
       (ev) => {
         if (ev.type === "delta") onEvent({ type: "synth", status: "delta", text: ev.text });
         if (ev.type === "done" && ev.structured) lastStructured = ev.structured;
