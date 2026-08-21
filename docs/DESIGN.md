@@ -166,6 +166,9 @@ panel for a bias that style recognition defeats anyway); per-turn random letter 
 question-keyed one keeps retries stable); provider-aware token budgets (characters are enough
 for one user); execution "profiles" (lane ticking already is one). Recorded for v2 in
 `docs/THREADS.md`: confirming or re-synthesising an "Unfused" answer before it becomes history,
-and running the service under a dedicated OS account. "OpenRouter Fusion" above names the
+and running the service under a dedicated OS account. Browser QA of this round found that for a
+Chinese question the synthesizer translated the `candidate X` token ("候选 A", "候选 B、C、D"),
+leaving bare letters in the UI: the prompt now forbids translating the token and the UI also
+accepts the translation and letter lists — still never a bare letter. "OpenRouter Fusion" above names the
 product that inspired the analysis format; this project does not use OpenRouter.
 
