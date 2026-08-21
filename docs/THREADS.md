@@ -17,6 +17,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 12 | `Synthesizer` strategy + child table for synthesis attempts | OPEN | v2; today synthesis is a side capability of a panel provider (`supportsJsonSchema`) |
 | 13 | Versioned SQLite migrations | OPEN | v2; today: `CREATE IF NOT EXISTS` + idempotent `ALTER TABLE` in `src/store/db.ts` |
 | 14 | "Unfused" answer: confirm or re-synthesise before it is replayed as history | OPEN | v2; today it enters history like any answer (consistency argument in `docs/DESIGN.md`) — a "Retry synthesis" button is the likely shape |
+| 16 | Share with a few friends over the owner's domain | ON-HOLD | Decided 2026-08-21 to defer. Path when resumed: Cloudflare Tunnel to the loopback-bound service + Access email allowlist (TLS and identity outside the app); `src/server/auth.ts` trusts the Access JWT as identity; `conversations.owner` column and per-owner filtering in `src/store/db.ts` + `src/server/main.ts`; per-user daily turn cap; cookie `secure` behind the proxy. File access is already contained by the jail (#15); the subscription-sharing terms risk is the owner's call |
 
 ## Archive
 
