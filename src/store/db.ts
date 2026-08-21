@@ -88,7 +88,7 @@ export class Store {
     this.db.exec(SCHEMA);
     // Additive columns for databases created before they existed (no migration framework yet;
     // each line is idempotent because SQLite rejects a duplicate column).
-    for (const ddl of ["ALTER TABLE turns ADD COLUMN answer_provider TEXT"]) {
+    for (const ddl of ["ALTER TABLE turns ADD COLUMN answer_provider TEXT", "ALTER TABLE lane_results ADD COLUMN error_kind TEXT"]) {
       try {
         this.db.exec(ddl);
       } catch (e) {
@@ -162,10 +162,10 @@ export class Store {
   saveLane(turnId: string, lane: LaneResult) {
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO lane_results (turn_id, provider, status, answer, ms, error, attempts, usage_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO lane_results (turn_id, provider, status, answer, ms, error, error_kind, attempts, usage_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(turnId, lane.provider, lane.status, lane.answer, lane.ms, lane.error, lane.attempts, lane.usage ? JSON.stringify(lane.usage) : null);
+      .run(turnId, lane.provider, lane.status, lane.answer, lane.ms, lane.error, lane.errorKind, lane.attempts, lane.usage ? JSON.stringify(lane.usage) : null);
   }
 
   finishTurn(
@@ -220,7 +220,7 @@ export class Store {
         answer: l.answer,
         ms: l.ms,
         error: l.error,
-        exitCode: null,
+        errorKind: l.error_kind ?? null,
         attempts: l.attempts,
         usage: l.usage_json ? JSON.parse(l.usage_json) : undefined,
       }),

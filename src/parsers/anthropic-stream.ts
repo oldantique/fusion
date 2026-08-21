@@ -5,6 +5,7 @@
  * Relevant lines:
  *   {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}}
  *   {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"..."}}}
+ *   {"type":"rate_limit_event","rate_limit_info":{"status":"allowed",...}}   (claude only)
  *   {"type":"result","is_error":false,"result":"full text","structured_output":{...},"usage":{...},"total_cost_usd":n}
  */
 import type { LaneEvent, Usage } from "../types.ts";
@@ -14,6 +15,8 @@ export interface AnthropicStreamState {
   text: string;
   done: boolean;
   result?: any;
+  /** claude's `rate_limit_info`: `status` is "allowed" until the account is throttled. */
+  rateLimit?: { status?: string; resetsAt?: number; rateLimitType?: string };
 }
 
 /**
@@ -46,6 +49,11 @@ export function createAnthropicStreamParser(streamJsonField?: string) {
           }
         }
       }
+      return [];
+    }
+    if (obj.type === "rate_limit_event") {
+      // Recorded, not emitted: base.ts uses it to tell a quota failure from an ordinary one.
+      if (obj.rate_limit_info && typeof obj.rate_limit_info === "object") state.rateLimit = obj.rate_limit_info;
       return [];
     }
     if (obj.type === "result") {

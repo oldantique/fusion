@@ -6,7 +6,7 @@ import { ConflictError, Jobs, type JobEvent } from "../src/server/jobs.ts";
 import type { FuseInput, FuseOutput } from "../src/synth/fuse.ts";
 
 const lane = (provider: "grok" | "kimi", answer: string | null) => ({
-  provider, status: answer ? "done" : "failed", answer, ms: 1, error: answer ? null : "aborted", exitCode: null, attempts: 1,
+  provider, status: answer ? "done" : "failed", answer, ms: 1, error: answer ? null : "aborted", errorKind: answer ? null : "aborted", attempts: 1,
 } as const);
 
 /** A scripted fuse: streams two deltas per lane, finishes lanes, then synthesizes — or waits for abort. */

@@ -15,8 +15,10 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
  * Why a call failed. Drives the retry decision in `runLane`: only `exit` (non-zero exit, cause
  * unknown) and `empty` (clean exit, no answer) are worth a second attempt; a timeout will most
  * likely time out again, and abort/spawn/internal failures cannot be fixed by retrying.
+ * `rate_limit` is deliberately not retryable: the quota is still exhausted a retry later, so a
+ * second attempt only burns more of it and delays the fallback.
  */
-export type LaneErrorKind = "timeout" | "aborted" | "spawn" | "exit" | "empty" | "internal";
+export type LaneErrorKind = "timeout" | "aborted" | "spawn" | "exit" | "empty" | "internal" | "rate_limit";
 
 /** Events emitted by a provider while a call is running. */
 export type LaneEvent =
@@ -40,7 +42,8 @@ export interface LaneResult {
   answer: string | null;
   ms: number;
   error: string | null;
-  exitCode: number | null;
+  /** Why it failed, so the UI and the store can tell a quota block from a crash; null when done. */
+  errorKind: LaneErrorKind | null;
   attempts: number;
   usage?: Usage;
 }

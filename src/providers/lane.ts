@@ -29,13 +29,13 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 export async function runLane(provider: Provider, opts: CallOptions, sink: LaneSink): Promise<LaneResult> {
   const maxAttempts = Math.max(1, opts.attempts ?? config.laneAttempts);
   const sem = semaphores[provider.id];
-  const failed = (error: string, attempts: number, ms: number): LaneResult => ({
+  const failed = (error: string, errorKind: LaneErrorKind, attempts: number, ms: number): LaneResult => ({
     provider: provider.id,
     status: "failed",
     answer: null,
     ms,
     error,
-    exitCode: null,
+    errorKind,
     attempts,
     usage: undefined,
   });
@@ -45,7 +45,7 @@ export async function runLane(provider: Provider, opts: CallOptions, sink: LaneS
   try {
     release = await sem.acquire(opts.signal);
   } catch (e) {
-    return failed(e instanceof AbortedError ? "aborted" : `internal: ${(e as Error).message}`, 0, 0);
+    return e instanceof AbortedError ? failed("aborted", "aborted", 0, 0) : failed(`internal: ${(e as Error).message}`, "internal", 0, 0);
   }
 
   // Measured from the first real attempt, not from queue entry, so a queued lane's time is its own.
@@ -55,7 +55,7 @@ export async function runLane(provider: Provider, opts: CallOptions, sink: LaneS
   let attempt = 0;
   try {
     for (attempt = 1; attempt <= maxAttempts; attempt++) {
-      if (opts.signal?.aborted) return failed("aborted", attempt - 1, Date.now() - started);
+      if (opts.signal?.aborted) return failed("aborted", "aborted", attempt - 1, Date.now() - started);
       sink({ type: "status", status: "running", attempt, at: Date.now() });
       let text: string | null = null;
       let usage: LaneResult["usage"];
@@ -74,10 +74,10 @@ export async function runLane(provider: Provider, opts: CallOptions, sink: LaneS
         }
       } catch (e) {
         // A throw here is a bug in a provider/parser, not a CLI failure; report, don't retry.
-        return failed(`internal: ${e instanceof Error ? e.message : String(e)}`, attempt, Date.now() - started);
+        return failed(`internal: ${e instanceof Error ? e.message : String(e)}`, "internal", attempt, Date.now() - started);
       }
       if (error === null && text !== null && text.trim().length > 0) {
-        return { provider: provider.id, status: "done", answer: text, ms: Date.now() - started, error: null, exitCode: 0, attempts: attempt, usage };
+        return { provider: provider.id, status: "done", answer: text, ms: Date.now() - started, error: null, errorKind: null, attempts: attempt, usage };
       }
       lastError = error ?? "empty answer";
       lastKind = error === null ? "empty" : kind;
@@ -87,5 +87,5 @@ export async function runLane(provider: Provider, opts: CallOptions, sink: LaneS
   } finally {
     release();
   }
-  return failed(lastError, Math.min(attempt, maxAttempts), Date.now() - started);
+  return failed(lastError, lastKind, Math.min(attempt, maxAttempts), Date.now() - started);
 }

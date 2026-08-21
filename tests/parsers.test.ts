@@ -5,6 +5,7 @@ import path from "node:path";
 import { createAnthropicStreamParser } from "../src/parsers/anthropic-stream.ts";
 import { createCodexParser, createKimiParser } from "../src/parsers/whole-message.ts";
 import { createJsonFieldStreamer } from "../src/parsers/json-field-stream.ts";
+import { classifyFailure } from "../src/providers/base.ts";
 import type { LaneEvent } from "../src/types.ts";
 
 const FIX = path.join(import.meta.dirname, "..", "fixtures");
@@ -25,6 +26,20 @@ test("claude stream-json: deltas then done with result text", () => {
   assert.equal(done.type, "done");
   assert.equal(done.text, "The capital of France is Paris.");
   assert.ok(done.usage.costUsd > 0);
+});
+
+test("claude's rate_limit_event is recorded on the parser state, not emitted", () => {
+  const p = createAnthropicStreamParser();
+  const ev = run(p, "cmin.ndjson");
+  assert.equal(p.state.rateLimit?.status, "allowed");
+  assert.ok(!ev.some((e) => e.type === "error"), "a healthy quota record is not an error");
+});
+
+test("classifyFailure marks quota messages as rate_limit and leaves the rest alone", () => {
+  assert.equal(classifyFailure("You've hit your usage limit · resets at 5pm", "exit"), "rate_limit");
+  assert.equal(classifyFailure("HTTP 429 Too Many Requests", "exit"), "rate_limit");
+  assert.equal(classifyFailure("exit 1: boom", "exit"), "exit");
+  assert.equal(classifyFailure("no output (exit 0): (no diagnostics)", "empty"), "empty");
 });
 
 test("grok streaming-messages-json parses with the same parser (thinking + text)", () => {

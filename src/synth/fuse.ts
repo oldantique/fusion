@@ -78,7 +78,7 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
   const lanes: LaneResult[] = settled.map((s, i) =>
     s.status === "fulfilled"
       ? s.value
-      : { provider: ids[i]!, status: "failed", answer: null, ms: 0, error: `internal: ${String(s.reason)}`, exitCode: null, attempts: 0 },
+      : { provider: ids[i]!, status: "failed", answer: null, ms: 0, error: `internal: ${String(s.reason)}`, errorKind: "internal", attempts: 0 },
   );
 
   const done = lanes.filter((l) => l.status === "done" && l.answer);

@@ -207,7 +207,13 @@ function paintLaneResult(lane, r) {
     badge(lane.status, `done${r.attempts > 1 ? ` (retry)` : ""}`, "ok");
     lane.body.set(r.answer || "");
   } else {
-    badge(lane.status, r.error === "aborted" ? "stopped" : "failed", r.error === "aborted" ? "" : "bad");
+    // Kinds the user can act on get their own wording; everything else is a plain failure.
+    const [text, cls] =
+      r.errorKind === "aborted" ? ["stopped", ""]
+      : r.errorKind === "rate_limit" ? ["rate limited", "warn"]
+      : r.errorKind === "timeout" ? ["timed out", "bad"]
+      : ["failed", "bad"];
+    badge(lane.status, text, cls);
     lane.body.set("");
     const e = document.createElement("div");
     e.className = "error-text";

@@ -10,8 +10,8 @@ test("store: conversation → turn → lanes → history replay", () => {
   const t1 = s.startTurn(conv.id, "q1", ["claude", "grok"]);
   assert.equal(t1.idx, 0);
   assert.equal(t1.status, "running");
-  s.saveLane(t1.id, { provider: "claude", status: "done", answer: "a", ms: 5, error: null, exitCode: 0, attempts: 1 });
-  s.saveLane(t1.id, { provider: "grok", status: "failed", answer: null, ms: 9, error: "x", exitCode: null, attempts: 2 });
+  s.saveLane(t1.id, { provider: "claude", status: "done", answer: "a", ms: 5, error: null, errorKind: null, attempts: 1 });
+  s.saveLane(t1.id, { provider: "grok", status: "failed", answer: null, ms: 9, error: "x", errorKind: "rate_limit", attempts: 2 });
   s.finishTurn(t1.id, "fused1", { analysis: { consensus: ["c"], contradictions: [], unique_insights: [], gaps: [] }, answer: "fused1", provider: "claude", ms: 7, letterMap: { A: "claude" } }, 0, null);
 
   const t2 = s.startTurn(conv.id, "q2", ["claude"]);
@@ -25,6 +25,8 @@ test("store: conversation → turn → lanes → history replay", () => {
   assert.deepEqual(got.letter_map, { A: "claude" });
   assert.equal(got.lanes.length, 2);
   assert.equal(got.lanes.find((l) => l.provider === "grok")?.attempts, 2);
+  assert.equal(got.lanes.find((l) => l.provider === "grok")?.errorKind, "rate_limit");
+  assert.equal(got.lanes.find((l) => l.provider === "claude")?.errorKind, null);
 
   s.failStaleTurns();
   assert.equal(s.getTurn(t2.id)!.status, "failed");

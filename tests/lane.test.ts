@@ -30,6 +30,14 @@ test("a timeout is not retried", async () => {
   assert.equal(r.attempts, 1);
 });
 
+test("a rate limit is not retried — the quota is still gone a retry later", async () => {
+  const p = stub(() => [{ type: "error", message: "You've hit your usage limit", kind: "rate_limit" }]);
+  const r = await runLane(p, { prompt: "q", system: "s" }, noop);
+  assert.equal(r.status, "failed");
+  assert.equal(p.calls, 1);
+  assert.equal(r.errorKind, "rate_limit");
+});
+
 test("a non-zero exit is retried once and can succeed", async () => {
   const p = stub((n) => (n === 1 ? [{ type: "error", message: "exit 1: boom", kind: "exit" }] : [{ type: "done", text: "OK" }]));
   const r = await runLane(p, { prompt: "q", system: "s" }, noop);
@@ -50,6 +58,14 @@ test("attempts: 1 disables the retry", async () => {
   const p = stub(() => [{ type: "error", message: "exit 1", kind: "exit" }]);
   const r = await runLane(p, { prompt: "q", system: "s", attempts: 1 }, noop);
   assert.equal(p.calls, 1);
+});
+
+test("the failing kind is carried into the result, so the UI and the store can see it", async () => {
+  const p = stub(() => [{ type: "error", message: "timed out after 1s", kind: "timeout" }]);
+  const r = await runLane(p, { prompt: "q", system: "s" }, noop);
+  assert.equal(r.errorKind, "timeout");
+  const ok = await runLane(stub(() => [{ type: "done", text: "OK" }]), { prompt: "q", system: "s" }, noop);
+  assert.equal(ok.errorKind, null);
 });
 
 test("a provider that throws yields an internal failure instead of rejecting", async () => {

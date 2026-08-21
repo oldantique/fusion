@@ -1,5 +1,5 @@
 /** Generic CLI-backed provider: build argv, run, feed NDJSON into a parser, normalize errors. */
-import type { CallOptions, LaneEvent, Provider, ProviderId } from "../types.ts";
+import type { CallOptions, LaneErrorKind, LaneEvent, Provider, ProviderId } from "../types.ts";
 import { runLines, tryJson, type ProcessExit } from "./process.ts";
 import { config } from "../config.ts";
 
@@ -11,7 +11,8 @@ export interface Invocation {
 
 export interface Parser {
   feed(obj: any): LaneEvent[];
-  state: { text: string; done: boolean };
+  /** `rateLimit` is claude's `rate_limit_info` record when its stream carried one. */
+  state: { text: string; done: boolean; rateLimit?: { status?: string } };
 }
 
 export interface CliProviderSpec {
@@ -34,6 +35,12 @@ export function cliProvider(spec: CliProviderSpec): Provider {
     async *call(opts: CallOptions): AsyncGenerator<LaneEvent, void, void> {
       const inv = spec.build(opts);
       const parser = spec.parser(opts);
+      // Only claude reports quota state as a record; for the others the message text is the signal.
+      const classify = (message: string, fallback: LaneErrorKind): LaneErrorKind => {
+        const status = parser.state.rateLimit?.status;
+        if (status !== undefined && status !== "allowed") return "rate_limit";
+        return classifyFailure(message, fallback);
+      };
       let exit: ProcessExit | undefined;
       let sawDone = false;
       let sawError = false;
@@ -51,7 +58,13 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         const events = obj !== undefined ? parser.feed(obj) : (spec.plainLine?.(item.line, parser) ?? []);
         for (const ev of events) {
           if (ev.type === "done") sawDone = true;
-          if (ev.type === "error") sawError = true;
+          if (ev.type === "error") {
+            sawError = true;
+            // Parsers cannot tell a quota block from any other reported failure, so they all say
+            // "exit"; re-classify on the way out, where the rate-limit record is also visible.
+            yield { ...ev, kind: ev.kind === "exit" ? classify(ev.message, "exit") : ev.kind };
+            continue;
+          }
           yield ev;
         }
       }
@@ -70,7 +83,8 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         return;
       }
       if (exit.code !== 0) {
-        yield { type: "error", message: `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${diagnostics(exit.stderr, plain)}`, kind: exit.spawnFailed ? "spawn" : "exit" };
+        const message = `exit ${exit.code}${exit.signal ? ` (${exit.signal})` : ""}: ${diagnostics(exit.stderr, plain)}`;
+        yield { type: "error", message, kind: exit.spawnFailed ? "spawn" : classify(message, "exit") };
         return;
       }
       if (!sawDone) {
@@ -79,11 +93,23 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         if (parser.state.text.trim().length > 0) {
           yield { type: "done", text: parser.state.text };
         } else {
-          yield { type: "error", message: `no output (exit 0): ${diagnostics(exit.stderr, plain)}`, kind: "empty" };
+          const message = `no output (exit 0): ${diagnostics(exit.stderr, plain)}`;
+          yield { type: "error", message, kind: classify(message, "empty") };
         }
       }
     },
   };
+}
+
+/**
+ * A quota block is reported by every CLI as an ordinary failure, but retrying one is worse than
+ * useless: the limit still holds a moment later and the retry burns more of it. Match it on the
+ * message so `runLane` can skip the retry and the UI can say "rate limited" rather than "failed".
+ */
+const RATE_LIMIT_RE = /rate.?limit|usage limit|quota|too many requests|\b429\b|overloaded/i;
+
+export function classifyFailure(message: string, fallback: LaneErrorKind): LaneErrorKind {
+  return RATE_LIMIT_RE.test(message) ? "rate_limit" : fallback;
 }
 
 /** stderr first, then whatever non-JSON text the CLI put on stdout; "(no diagnostics)" if both are empty. */
