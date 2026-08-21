@@ -28,7 +28,7 @@ export const claude: Provider = cliProvider({
       "--model",
       config.models.claude,
       "--effort",
-      config.effort,
+      opts.effort ?? config.effort,
       "--tools",
       "",
       "--system-prompt",
@@ -68,7 +68,7 @@ export const codex: Provider = cliProvider({
         "-m",
         config.models.codex,
         "-c",
-        `model_reasoning_effort="${config.effort}"`,
+        `model_reasoning_effort="${opts.effort ?? config.effort}"`,
         inlineSystem(opts),
       ],
     };
@@ -83,6 +83,7 @@ export const kimi: Provider = cliProvider({
   supportsJsonSchema: false,
   build(opts) {
     // Effort lives in ~/.kimi-code/config.toml ([thinking] effort); k3 defaults to high.
+    // There is no per-call flag, so opts.effort cannot be honoured here.
     return {
       cmd: "kimi",
       args: ["-m", config.models.kimi, "--output-format", "stream-json", "-p", inlineSystem(opts)],
@@ -107,7 +108,7 @@ export const grok: Provider = cliProvider({
         "-m",
         config.models.grok,
         "--reasoning-effort",
-        config.effort,
+        opts.effort ?? config.effort,
         "--deny",
         "Write(**)",
         "--deny",

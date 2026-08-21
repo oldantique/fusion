@@ -25,11 +25,13 @@ function int(name: string, dflt: number, min: number, max = Number.MAX_SAFE_INTE
 // default" with exit 0, so a typo must be caught here rather than discovered in the output.
 const EFFORTS = ["low", "medium", "high", "xhigh"];
 
-function effort(): string {
-  const v = process.env.FUSION_EFFORT ?? "high";
-  if (!EFFORTS.includes(v)) throw new Error(`FUSION_EFFORT must be one of ${EFFORTS.join("|")}, got "${v}"`);
+function effort(name: string, raw: string | undefined, dflt: string): string {
+  const v = raw ?? dflt;
+  if (!EFFORTS.includes(v)) throw new Error(`${name} must be one of ${EFFORTS.join("|")}, got "${v}"`);
   return v;
 }
+
+const PANEL_EFFORT = effort("FUSION_EFFORT", process.env.FUSION_EFFORT, "high");
 
 export const config = {
   root: ROOT,
@@ -65,7 +67,13 @@ export const config = {
     kimi: process.env.KIMI_MODEL ?? "kimi-code/k3",
     grok: process.env.GROK_MODEL ?? "grok-4.6",
   },
-  effort: effort(),
+  effort: PANEL_EFFORT,
+  /**
+   * Effort for the synthesizer call, which does a different job from a panel lane: it merges
+   * answers that already exist rather than producing one. Separate knob so that can be tuned (or
+   * measured) on its own; equal to the panel effort until a measurement says otherwise.
+   */
+  synthEffort: effort("FUSION_SYNTH_EFFORT", process.env.FUSION_SYNTH_EFFORT, PANEL_EFFORT),
 };
 
 export type Config = typeof config;

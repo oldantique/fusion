@@ -57,7 +57,7 @@ app.get("/api/providers", (c) =>
     })),
   ),
 );
-app.get("/api/health", (c) => c.json({ ok: true, effort: config.effort, laneTimeoutSec: config.laneTimeoutMs / 1000 }));
+app.get("/api/health", (c) => c.json({ ok: true, effort: config.effort, synthEffort: config.synthEffort, laneTimeoutSec: config.laneTimeoutMs / 1000 }));
 
 // ---- conversations ----
 app.get("/api/conversations", (c) => c.json(store.listConversations()));

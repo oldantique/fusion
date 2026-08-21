@@ -3,9 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fuse, type FuseEvent } from "../src/synth/fuse.ts";
 import { runLane } from "../src/providers/lane.ts";
-import type { LaneEvent, Provider, ProviderId } from "../src/types.ts";
+import type { CallOptions, LaneEvent, Provider, ProviderId } from "../src/types.ts";
 
-type Script = (opts: { jsonSchema?: object; prompt: string }) => LaneEvent[];
+type Script = (opts: CallOptions) => LaneEvent[];
 function stub(id: ProviderId, script: Script, supportsJsonSchema = false): Provider {
   return {
     id,
@@ -21,9 +21,14 @@ const ok = (text: string): Script => () => [{ type: "done", text }];
 const fail: Script = () => [{ type: "error", message: "exit 1: nope", kind: "exit" }];
 const synthOrPanel = (panel: string, synth: LaneEvent[]): Script => (o) => (o.prompt.includes("<candidate") ? synth : [{ type: "done", text: panel }]);
 
-async function run(providers: Partial<Record<ProviderId, Provider>>, ids: ProviderId[], signal?: AbortSignal) {
+async function run(
+  providers: Partial<Record<ProviderId, Provider>>,
+  ids: ProviderId[],
+  signal?: AbortSignal,
+  extraDeps: { synthEffort?: string } = {},
+) {
   const events: FuseEvent[] = [];
-  const out = await fuse({ question: "q?", history: [], providerIds: ids, signal, onEvent: (e) => events.push(e) }, { providers, runLane });
+  const out = await fuse({ question: "q?", history: [], providerIds: ids, signal, onEvent: (e) => events.push(e) }, { providers, runLane, ...extraDeps });
   return { out, events };
 }
 
@@ -92,4 +97,18 @@ test("abort before synthesis yields no answer and no degraded pick", async () =>
   const grok: Provider = { ...stub("grok", ok("g")), async *call() { ac.abort(); yield { type: "done", text: "g" }; } };
   const { out } = await run({ claude, grok }, ["claude", "grok"], ac.signal);
   assert.equal(out.answer, null);
+});
+
+test("the synthesizer call carries its own effort; panel lanes carry none", async () => {
+  const efforts: { panel?: string; synth?: string } = {};
+  const record = (key: "panel" | "synth"): Script => (o) => {
+    efforts[key] = o.effort;
+    return [{ type: "done", text: key }];
+  };
+  const claude = stub("claude", (o) => (o.prompt.includes("<candidate") ? record("synth")(o) : [{ type: "done", text: "c" }]), true);
+  const grok = stub("grok", record("panel"));
+  const { out } = await run({ claude, grok }, ["claude", "grok"], undefined, { synthEffort: "medium" });
+  assert.equal(out.answer, "synth");
+  assert.equal(efforts.panel, undefined, "a panel lane uses the configured default, not an override");
+  assert.equal(efforts.synth, "medium");
 });

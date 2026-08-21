@@ -43,6 +43,8 @@ export interface FuseOutput {
 export interface FuseDeps {
   providers: Partial<Record<ProviderId, Provider>>;
   runLane: typeof realRunLane;
+  /** Test injection only; production reads the configured value. */
+  synthEffort?: string;
 }
 
 /**
@@ -112,6 +114,7 @@ async function synthesize(
   deps: FuseDeps,
 ): Promise<SynthesisResult | null> {
   const { prompt, letterMap } = synthPrompt(question, rendered, lanes);
+  const effort = deps.synthEffort ?? config.synthEffort;
   // One lane-timeout for the whole chain: the user already waited for the panel; a fallback that
   // itself takes the full timeout is not worth another one on top.
   const deadline = AbortSignal.timeout(config.laneTimeoutMs);
@@ -128,8 +131,8 @@ async function synthesize(
     const result = await deps.runLane(
       provider,
       structured
-        ? { prompt, system: SYNTH_SYSTEM, jsonSchema: SYNTH_SCHEMA, streamField: "answer", signal: chainSignal, attempts: 1 }
-        : { prompt: `${prompt}\n\nWrite only the final merged Markdown answer.`, system: SYNTH_SYSTEM, signal: chainSignal, attempts: 1 },
+        ? { prompt, system: SYNTH_SYSTEM, jsonSchema: SYNTH_SCHEMA, streamField: "answer", signal: chainSignal, attempts: 1, effort }
+        : { prompt: `${prompt}\n\nWrite only the final merged Markdown answer.`, system: SYNTH_SYSTEM, signal: chainSignal, attempts: 1, effort },
       (ev) => {
         if (ev.type === "delta") onEvent({ type: "synth", status: "delta", text: ev.text });
         if (ev.type === "done" && ev.structured) lastStructured = ev.structured;

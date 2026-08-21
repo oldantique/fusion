@@ -64,6 +64,8 @@ export interface CallOptions {
   /** With jsonSchema: name of the string field to stream as deltas (e.g. "answer"). */
   streamField?: string;
   signal?: AbortSignal;
+  /** Override the configured reasoning effort (the synthesizer has its own; kimi has no flag). */
+  effort?: string;
   /** Override the configured attempt count (the synthesizer chain uses one attempt per provider). */
   attempts?: number;
 }
