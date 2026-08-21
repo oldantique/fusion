@@ -7,6 +7,7 @@ This file is the single home for *which CLI versions the parsers were verified a
 |---|---|
 | 2026-08-20 | claude 2.1.237 · codex-cli 0.147.0 · kimi 0.36.1 · grok 1.0.3 |
 | 2026-08-20 | kimi 0.38.0 — same shapes as `kimi.ndjson`, verified by `npm run smoke` and a fresh capture; fixture unchanged |
+| 2026-08-21 | claude 2.1.238 — same event shapes as `claude.ndjson`, `--help` unchanged, Chinese default still holds; verified by `npm run smoke` and a fresh capture; fixture unchanged |
 
 Files: `claude.ndjson` (default system prompt), `cmin.ndjson` (trimmed system prompt),
 `claude-json-schema.ndjson` (`--json-schema` run), `codex.ndjson`, `cx2.ndjson`
