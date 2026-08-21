@@ -20,7 +20,7 @@ const out = await fuse({
     if (ev.type === "error") console.error(`[error] ${ev.message}`);
   },
 });
-console.error(`streamed synth chars: ${synthText.length}`);
+console.error(`streamed synth chars: ${synthText.length}${out.synthesis ? `; synth ${out.synthesis.provider} ${out.synthesis.ms}ms` : ""}`);
 console.log("\n===== ANSWER =====\n" + out.answer);
 console.log("\n===== ANALYSIS =====\n" + JSON.stringify(out.synthesis?.analysis, null, 2));
 console.log("\n===== LETTERS =====\n" + JSON.stringify(out.synthesis?.letterMap));
