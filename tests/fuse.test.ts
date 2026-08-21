@@ -81,7 +81,7 @@ test("falls back to the next synthesizer when claude fails, in the documented or
   assert.equal(out.synthesis?.provider, "grok");
   assert.equal(out.synthesis?.analysis, null);
   const starts = events.filter((e): e is Extract<FuseEvent, { status: "start" }> => e.type === "synth" && e.status === "start");
-  assert.deepEqual(starts.map((s) => [s.provider, s.fallback]), [["claude", false], ["grok", true]]);
+  assert.deepEqual(starts.map((s) => [s.provider, s.fallback, s.retry]), [["claude", false, false], ["claude", false, true], ["grok", true, false]]);
 });
 
 test("when every synthesizer fails, the best raw answer is shown and marked as unfused", async () => {
@@ -149,11 +149,11 @@ test("a synthesizer that hangs is cut off, and the fallback gets a full timeout 
   assert.equal(out.answer, "grok-fused");
   assert.equal(out.synthesis?.provider, "grok");
   const starts = events.filter((e): e is Extract<FuseEvent, { status: "start" }> => e.type === "synth" && e.status === "start");
-  assert.deepEqual(starts.map((s) => [s.provider, s.fallback]), [["claude", false], ["grok", true]]);
+  assert.deepEqual(starts.map((s) => [s.provider, s.fallback, s.retry]), [["claude", false, false], ["claude", false, true], ["grok", true, false]]);
   assert.ok(Date.now() - t0 >= 50, "the first synthesizer really ran until its own timeout");
 });
 
-test("the whole synthesizer chain is capped at twice the lane timeout", async () => {
+test("the whole synthesizer chain is capped at three lane timeouts (retry + fallback)", async () => {
   const claude = hangingSynth("claude", "claude-raw", true);
   const grok = hangingSynth("grok", "grok-raw");
   const t0 = Date.now();
@@ -161,6 +161,6 @@ test("the whole synthesizer chain is capped at twice the lane timeout", async ()
   const elapsed = Date.now() - t0;
   assert.equal(out.synthesis, null);
   assert.equal(out.answer, "claude-raw", "the best raw answer is shown instead");
-  assert.ok(elapsed >= 90, `both attempts ran (${elapsed}ms)`);
-  assert.ok(elapsed < 150, `the chain was capped at 2x, not 3x (${elapsed}ms)`);
+  assert.ok(elapsed >= 140, `claude twice and grok once all ran (${elapsed}ms)`);
+  assert.ok(elapsed < 200, `the chain was capped at 3x, not 4x (${elapsed}ms)`);
 });

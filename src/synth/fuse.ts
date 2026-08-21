@@ -14,7 +14,8 @@ export type FuseEvent =
   | { type: "lane"; provider: ProviderId; status: "delta"; text: string }
   | { type: "lane"; provider: ProviderId; status: "done"; result: LaneResult }
   | { type: "lane"; provider: ProviderId; status: "failed"; result: LaneResult }
-  | { type: "synth"; status: "start"; provider: ProviderId; fallback: boolean }
+  /** `fallback` — a different synthesizer than the preferred one; `retry` — the same one trying again. */
+  | { type: "synth"; status: "start"; provider: ProviderId; fallback: boolean; retry: boolean }
   | { type: "synth"; status: "delta"; text: string }
   | { type: "synth"; status: "done"; result: SynthesisResult }
   /** No synthesis: one lane only, every lane failed, or (with `provider`) synthesis failed and that lane's raw answer is shown instead. */
@@ -55,6 +56,13 @@ export interface FuseDeps {
  * the lane whose raw answer is shown when every synthesizer fails.
  */
 export const SYNTH_ORDER: ProviderId[] = ["claude", "grok", "codex", "kimi"];
+/**
+ * The preferred synthesizer gets a second attempt before the chain moves on: it is the only one
+ * that produces the analysis, and its failures are mostly transient (a timeout on a heavy
+ * question, an empty result). The fallbacks get one attempt each — by then the user has waited
+ * long enough that a different model is a better bet than the same one a third time.
+ */
+export const SYNTH_CHAIN: ProviderId[] = [SYNTH_ORDER[0]!, ...SYNTH_ORDER];
 
 export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realProviders, runLane: realRunLane }): Promise<FuseOutput> {
   const { question, history, signal, onEvent } = input;
@@ -119,16 +127,17 @@ async function synthesize(
   const timeoutMs = deps.synthTimeoutMs ?? config.laneTimeoutMs;
   // Every attempt gets a full lane timeout of its own, so a fallback started late is not handed
   // the sliver left over by the synthesizer that hung — that sliver would only produce a second
-  // timeout. The chain as a whole is capped at twice the lane timeout, because the user has
-  // already waited for the panel and an unbounded chain of four could triple that wait.
-  const cap = AbortSignal.timeout(2 * timeoutMs);
+  // timeout. The chain as a whole is capped at three lane timeouts: two for the preferred
+  // synthesizer's attempts and one for a fallback. The user has already waited for the panel and
+  // an unbounded chain of five could quadruple that wait.
+  const cap = AbortSignal.timeout(3 * timeoutMs);
   const chainSignal = signal ? AbortSignal.any([signal, cap]) : cap;
-  let fallback = false;
-  for (const id of SYNTH_ORDER) {
+  let previous: ProviderId | null = null;
+  for (const id of SYNTH_CHAIN) {
     const provider = deps.providers[id];
     if (!provider) continue;
     if (chainSignal.aborted) break;
-    onEvent({ type: "synth", status: "start", provider: id, fallback });
+    onEvent({ type: "synth", status: "start", provider: id, fallback: previous !== null && previous !== id, retry: previous === id });
     const attemptSignal = AbortSignal.any([chainSignal, AbortSignal.timeout(timeoutMs)]);
     const started = Date.now();
     const structured = provider.supportsJsonSchema;
@@ -150,7 +159,7 @@ async function synthesize(
       return out;
     }
     onEvent({ type: "error", message: `synthesizer ${id} failed: ${result.error}` });
-    fallback = true;
+    previous = id;
   }
   return null;
 }

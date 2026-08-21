@@ -35,7 +35,9 @@
   the lane.
 - `FUSION_SYNTH_EFFORT` sets the synthesizer's effort separately from the panel.
 - Each synthesizer attempt gets its own timeout (the fallback no longer inherits a sliver);
-  the chain is capped at two lane timeouts.
+  the preferred synthesizer is retried once before the chain falls back to another model, and
+  the chain is capped at three lane timeouts. The synth badge distinguishes "Retry:" from
+  "Fallback:".
 - Replayed history is trimmed in blocks so the prompt cache survives more turns.
 - `npm run fuse` prints the synthesizer's duration.
 - kimi lanes work under systemd (IPv4 fallback option passed to the child).

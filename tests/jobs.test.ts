@@ -30,7 +30,7 @@ function fakeFuse(opts: { hang?: boolean } = {}) {
       }
     }
     onEvent({ type: "lane", provider: "kimi", status: "done", result: lane("kimi", "K") });
-    onEvent({ type: "synth", status: "start", provider: "grok", fallback: false });
+    onEvent({ type: "synth", status: "start", provider: "grok", fallback: false, retry: false });
     onEvent({ type: "synth", status: "delta", text: "fu" });
     onEvent({ type: "synth", status: "delta", text: "sed" });
     const result = { analysis: null, answer: "fused", provider: "grok" as const, ms: 1, letterMap: { A: "grok" as const, B: "kimi" as const } };
@@ -170,10 +170,10 @@ test("a reconnect during a synthesizer fallback replays the winning attempt, not
   const jobs = new Jobs(store, async ({ onEvent }) => {
     onEvent({ type: "lane", provider: "grok", status: "done", result: lane("grok", "G") });
     onEvent({ type: "lane", provider: "kimi", status: "done", result: lane("kimi", "K") });
-    onEvent({ type: "synth", status: "start", provider: "claude", fallback: false });
+    onEvent({ type: "synth", status: "start", provider: "claude", fallback: false, retry: false });
     onEvent({ type: "synth", status: "delta", text: "half an ans" });
     await gate;
-    onEvent({ type: "synth", status: "start", provider: "grok", fallback: true });
+    onEvent({ type: "synth", status: "start", provider: "grok", fallback: true, retry: false });
     onEvent({ type: "synth", status: "delta", text: "fused" });
     onEvent({ type: "synth", status: "done", result });
     return { lanes: [lane("grok", "G"), lane("kimi", "K")], synthesis: result, answer: "fused", answerProvider: null, historyOmitted: 0 };

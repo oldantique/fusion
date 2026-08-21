@@ -203,3 +203,16 @@ shape the sibling `~/others/opencode` sweep uses). Both are a second home for a 
 to "mark" here because adding a fixtures row *is* the marking. Version comparison is also blind to
 a capability that appeared, so `--help-diff` keeps a committed per-CLI baseline of each
 `--help` under `fixtures/help/` — that diff is the only mechanical way a new flag becomes visible.
+
+### 2026-08-21 — The preferred synthesizer is retried before the chain falls back
+
+A heavy question (a chain-complex construction) timed out two panel lanes at the default lane
+timeout and then the Claude synthesis attempt as well; the chain went straight to grok, which
+loses the structured analysis. Claude's synthesis failures are mostly transient — a timeout on
+a hard prompt, an empty result — and the owner prefers a second Claude attempt over a faster
+answer from a different model. `SYNTH_CHAIN` in `src/synth/fuse.ts` therefore tries the
+preferred synthesizer twice and each fallback once; the chain cap grows from two lane timeouts to
+three (two for the preferred, one for a fallback), superseding the cap in the 2026-08-21 "second
+review round" entry. The `synth start` event now carries `retry` next to `fallback` so the UI
+can say which is happening.
+

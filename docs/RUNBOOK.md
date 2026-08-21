@@ -59,8 +59,9 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
 | Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
 | Fused answer or analysis ends mid-sentence / JSON invalid | Claude output cap reached (model-dependent default; CLI normally auto-continues) | See the `childEnv()` comment in `src/providers/process.ts` for the one knob |
-| Synth badge says "Fallback: …" | Claude synthesis failed (often rate limit) | Answer still produced without analysis; check Claude usage |
-| Turn feels slow after all lanes are done | Synthesis runs after the slowest lane, at its own effort | Lower `FUSION_SYNTH_EFFORT` in `.env` (trade-off recorded in `docs/DESIGN.md`); each synthesizer attempt has a full lane timeout and the chain at most two |
+| Synth badge says "Retry: …" | The preferred synthesizer failed once (timeout on a heavy question, empty result) and is trying again | Wait; it falls back to another model if the retry fails too |
+| Synth badge says "Fallback: …" | Claude synthesis failed twice (often rate limit or timeout) | Answer still produced without analysis; check Claude usage or raise `LANE_TIMEOUT_SEC` |
+| Turn feels slow after all lanes are done | Synthesis runs after the slowest lane, at its own effort | Lower `FUSION_SYNTH_EFFORT` in `.env` (trade-off recorded in `docs/DESIGN.md`); each synthesizer attempt has a full lane timeout and the chain at most three |
 | UI blank after deploy | frontend bundle missing | `npm run build:vendor` |
 | Diagram shows as code, labelled "could not be drawn" | The model wrote invalid mermaid | Nothing to fix; the source stays readable |
 | Turn stuck "running" after a restart | Process died mid-turn | Marked failed automatically on next start; re-ask |

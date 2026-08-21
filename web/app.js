@@ -479,7 +479,7 @@ function followTurn(turnId, view) {
     });
     es.addEventListener("synth", (e) => {
       const ev = JSON.parse(e.data);
-      if (ev.status === "start") { view.answer.set(""); badge(view.synthBadge, `${ev.fallback ? "Fallback: " : ""}Fusing with ${labelOf(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
+      if (ev.status === "start") { view.answer.set(""); badge(view.synthBadge, `${ev.retry ? "Retry: " : ev.fallback ? "Fallback: " : ""}Fusing with ${labelOf(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
       else if (ev.status === "delta") { view.answer.append(ev.text); }
       else if (ev.status === "done") { view.answer.set(ev.result.answer); badge(view.synthBadge, `Fused by ${labelOf(ev.result.provider)}`, "ok"); view.synthMeta.textContent = secs(ev.result.ms); paintAnalysis(view, ev.result.analysis, ev.result.letterMap); view.answerEl.classList.remove("cursor"); }
       else if (ev.status === "skipped") {
