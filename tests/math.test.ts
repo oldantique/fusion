@@ -2,6 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { marked } from "marked";
+import katex from "katex";
+import "katex/contrib/mhchem"; // side effect: teaches the bundled KaTeX \ce and \pu
 // @ts-expect-error - plain browser ES module, no types
 import { splitMath, restoreMath } from "../web/math.js";
 
@@ -85,4 +87,13 @@ test("no math means the html is returned untouched", () => {
   const { text, blocks } = split(md);
   assert.equal(text, md);
   assert.equal(restoreMath("<p>x</p>", blocks, fake), "<p>x</p>");
+});
+
+test("the vendored KaTeX understands mhchem's \\ce", () => {
+  // \ce only exists because the vendor entry imports katex/contrib/mhchem for its side effect;
+  // drop that import and this renders as a red \ce error instead of a formula.
+  const html = katex.renderToString("\\ce{H2O}", { throwOnError: false, output: "html" });
+  assert.doesNotMatch(html, /katex-error/, html);
+  assert.match(html, /<span class="mord mathrm">H<\/span>/);
+  assert.match(html, /msupsub/); // the 2 is set as a subscript, not literal text
 });

@@ -13,6 +13,9 @@ fs.writeFileSync(
 export { default as DOMPurify } from "dompurify";
 export { default as hljs } from "highlight.js/lib/common";
 export { default as katex } from "katex";
+// mhchem registers \\ce and \\pu on the katex singleton as a side effect; chemistry questions
+// are common enough that it is worth ~40kb in the always-loaded bundle.
+import "katex/contrib/mhchem";
 `,
 );
 await build({
