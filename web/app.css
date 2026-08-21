@@ -132,6 +132,16 @@ textarea { resize: vertical; width: 100%; }
 .md th, .md td { border: 1px solid var(--line); padding: 4px 10px; }
 .md blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--fg-2); }
 .md img { max-width: 100%; }
+/* Footnotes: a rule and a smaller type size, GitHub-style. marked-footnote emits an <h2> for
+   screen readers only, and the backref arrow is decoration. */
+.md .footnotes { margin-top: 20px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 0.9em; color: var(--fg-2); }
+.md .footnotes .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.md .footnotes ol { margin: 0; padding-left: 20px; }
+.md .footnotes li { margin: 2px 0; }
+.md .footnotes li > p { margin: 0; }
+.md .footnotes a[data-footnote-backref] { text-decoration: none; }
+.md sup a[data-footnote-ref] { text-decoration: none; padding: 0 1px; }
+.md [id^="footnote"]:target { background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 4px; }
 /* KaTeX inherits `color`, so the dark palette needs no override; a wide display equation gets
    its own scroller instead of stretching the answer column. */
 .md .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }

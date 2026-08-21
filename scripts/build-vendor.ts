@@ -10,6 +10,7 @@ fs.mkdirSync(outdir, { recursive: true });
 fs.writeFileSync(
   path.join(outdir, "entry.js"),
   `export { marked } from "marked";
+export { default as markedFootnote } from "marked-footnote";
 export { default as DOMPurify } from "dompurify";
 export { default as hljs } from "highlight.js/lib/common";
 export { default as katex } from "katex";

@@ -1,8 +1,9 @@
-import { marked, DOMPurify, hljs, katex } from "/vendor/bundle.js";
+import { marked, markedFootnote, DOMPurify, hljs, katex } from "/vendor/bundle.js";
 import { splitMath, restoreMath } from "./math.js";
 
 // ---------- markdown ----------
 marked.setOptions({ gfm: true, breaks: false });
+marked.use(markedFootnote());
 const renderTex = (tex, displayMode) =>
   katex.renderToString(tex, { displayMode, throwOnError: false, output: "html" });
 function render(md) {
@@ -33,7 +34,13 @@ function setMarkdown(el, md, final = false) {
   el.querySelectorAll("pre code:not(.language-mermaid)").forEach((b) => {
     try { hljs.highlightElement(b); } catch {}
   });
-  el.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
+  // Only links that leave the page get a new tab: a footnote's `#footnote-1` must stay here.
+  el.querySelectorAll("a[href]").forEach((a) => {
+    if (a.getAttribute("href").startsWith("#")) return;
+    a.target = "_blank";
+    a.rel = "noopener";
+  });
+  scopeFootnotes(el);
   enhanceCodeBlocks(el);
   if (final) renderDiagrams(el);
 }
@@ -65,6 +72,20 @@ function enhanceCodeBlocks(el) {
     pre.replaceWith(box);
     box.append(head, pre);
   });
+}
+
+/**
+ * Footnote ids are generated per answer ("footnote-1"), so a page holding a dozen turns would
+ * have a dozen of each and every backlink would jump to the oldest one. Suffix them with a
+ * number owned by this container so each answer's footnotes point inside itself.
+ */
+let mdScopeSeq = 0;
+function scopeFootnotes(el) {
+  if (!el.querySelector(".footnotes")) return;
+  const n = (el.dataset.mdScope ||= String(++mdScopeSeq));
+  for (const e of el.querySelectorAll("[id^='footnote']")) e.id = `${e.id}-${n}`;
+  for (const a of el.querySelectorAll("a[href^='#footnote']")) a.setAttribute("href", `${a.getAttribute("href")}-${n}`);
+  for (const e of el.querySelectorAll("[aria-describedby^='footnote']")) e.setAttribute("aria-describedby", `${e.getAttribute("aria-describedby")}-${n}`);
 }
 
 /** Copy `text` and say so on the button for a moment. */
