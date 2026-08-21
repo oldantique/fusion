@@ -10,8 +10,21 @@
  *  - a consumer that stops iterating early kills the child; nothing is left running unobserved.
  */
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import readline from "node:readline";
 import { config } from "../config.ts";
+
+/**
+ * What a jailed CLI may see of the real filesystem, besides the common base in `jailArgv`.
+ * Paths may start with `~`. Sources that do not exist are skipped (a CLI that is not set up then
+ * fails with its own "not logged in" rather than a bwrap mount error).
+ */
+export interface JailMounts {
+  rw?: string[];
+  ro?: string[];
+}
 
 export interface RunOptions {
   cmd: string;
@@ -22,6 +35,8 @@ export interface RunOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
+  /** When set (and FUSION_JAIL is on) the command runs inside a bubblewrap jail with these mounts. */
+  jail?: JailMounts;
 }
 
 export type ProcessLine = { kind: "line"; line: string };
@@ -61,6 +76,99 @@ export function childEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessE
   return env;
 }
 
+/**
+ * Environment variables that cross into the jail. Everything else is dropped (`--clearenv`): the
+ * CLIs need a HOME (a tmpfs with only their own state dir bound in), a PATH, locale, proxy and
+ * TLS settings — and nothing that points at files outside the jail.
+ */
+const JAIL_ENV_RE = /^(HOME|PATH|NODE_OPTIONS|TERM|LANG|LANGUAGE|LC_[A-Z]+|TZ|USER|LOGNAME|SHELL|NO_PROXY|no_proxy|[A-Za-z]+_PROXY|[a-z]+_proxy|SSL_CERT_FILE|SSL_CERT_DIR|NODE_EXTRA_CA_CERTS)$/;
+
+/**
+ * Host paths every jailed CLI gets read-only: the OS, the CA bundle, DNS and user lookup.
+ * `/etc` is deliberately not bound as a whole (it carries ssh and service config); the few files
+ * the CLIs resolve hosts and TLS through are listed one by one.
+ */
+const JAIL_BASE_RO = [
+  "/usr",
+  "/lib",
+  "/lib64",
+  "/bin",
+  "/sbin",
+  "/etc/resolv.conf",
+  "/etc/hosts",
+  "/etc/nsswitch.conf",
+  "/etc/passwd",
+  "/etc/localtime",
+  "/etc/ssl/certs",
+  "/etc/ca-certificates",
+];
+
+const expandHome = (p: string, home: string) => (p === "~" || p.startsWith("~/") ? path.join(home, p.slice(1)) : p);
+
+/**
+ * Where a CLI's code lives, so the jail can see it: the PATH directory its name resolves in and,
+ * following the symlink, the package root (the outermost `node_modules` for an npm install, else
+ * the binary's own directory). Only the install is exposed, never the rest of the home directory.
+ */
+export function cliInstallDirs(cmd: string, env: NodeJS.ProcessEnv = process.env): string[] {
+  if (!cmd.includes("/")) {
+    for (const dir of (env.PATH ?? "").split(path.delimiter).filter(Boolean)) {
+      const candidate = path.join(dir, cmd);
+      if (fs.existsSync(candidate)) {
+        cmd = candidate;
+        break;
+      }
+    }
+    if (!cmd.includes("/")) return []; // not on PATH; let the spawn fail with ENOENT as before
+  }
+  const linkDir = path.dirname(cmd);
+  let target: string;
+  try {
+    target = fs.realpathSync(cmd);
+  } catch {
+    return [linkDir];
+  }
+  const nm = target.indexOf(`${path.sep}node_modules${path.sep}`);
+  const root = nm >= 0 ? target.slice(0, nm + "/node_modules".length) : path.dirname(target);
+  return [...new Set([linkDir, root])];
+}
+
+/**
+ * Wrap a command in a bubblewrap jail. Pure: given the same inputs it returns the same argv, so
+ * the test can assert on it. The jail is a fresh mount namespace holding the read-only base, a
+ * tmpfs HOME and /tmp with only the provider's mounts bound in, the empty sandbox cwd (writable,
+ * so a CLI that insists on a scratch file still works), and nothing else of this machine.
+ * `--die-with-parent` + `--unshare-pid` make the CLI and every helper it spawns die with bwrap,
+ * which is in the process group `runLines` signals.
+ */
+export function jailArgv(
+  cmd: string,
+  args: string[],
+  mounts: JailMounts,
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  opts: { home?: string; exists?: (p: string) => boolean; installDirs?: string[] } = {},
+): { cmd: string; args: string[]; env: NodeJS.ProcessEnv } {
+  const home = opts.home ?? os.homedir();
+  const exists = opts.exists ?? fs.existsSync;
+  const installDirs = opts.installDirs ?? [...cliInstallDirs(cmd, env), path.dirname(fs.realpathSync(process.execPath))];
+  const out = ["--clearenv"];
+  const jailEnv: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (v !== undefined && JAIL_ENV_RE.test(k)) jailEnv[k] = v;
+  }
+  jailEnv.HOME = home;
+  for (const [k, v] of Object.entries(jailEnv)) out.push("--setenv", k, v!);
+  for (const p of JAIL_BASE_RO) if (exists(p)) out.push("--ro-bind", p, p);
+  out.push("--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--tmpfs", home);
+  // Order matters: later binds go over earlier ones, so the provider's rw mounts (which may live
+  // under a ro install root, e.g. ~/.kimi-code/bin) come after the ro ones.
+  for (const p of [...installDirs, ...(mounts.ro ?? []).map((p) => expandHome(p, home))]) if (exists(p)) out.push("--ro-bind", p, p);
+  for (const p of (mounts.rw ?? []).map((p) => expandHome(p, home))) if (exists(p)) out.push("--bind", p, p);
+  out.push("--bind", cwd, cwd, "--chdir", cwd, "--unshare-pid", "--die-with-parent", "--", cmd, ...args);
+  return { cmd: "bwrap", args: out, env: jailEnv };
+}
+
 /** Signal a child's whole process group; falls back to the child alone if the group is gone. */
 function signalTree(pid: number, sig: NodeJS.Signals) {
   try {
@@ -77,9 +185,29 @@ function signalTree(pid: number, sig: NodeJS.Signals) {
 /** Yields stdout lines, then exactly one `exit` record. Never throws for non-zero exit. */
 export async function* runLines(opts: RunOptions): AsyncGenerator<ProcessLine | ProcessExit> {
   const timeoutMs = opts.timeoutMs ?? config.laneTimeoutMs;
-  const child = spawn(opts.cmd, opts.args, {
-    cwd: opts.cwd ?? config.sandboxDir,
-    env: opts.env ?? childEnv(),
+  const cwd = opts.cwd ?? config.sandboxDir;
+  let { cmd, args } = opts;
+  let env = opts.env ?? childEnv();
+  if (opts.jail && config.jail) {
+    if (!config.bwrapPath) {
+      // Refuse loudly rather than run the CLI with the whole filesystem in view.
+      yield {
+        kind: "exit",
+        code: -1,
+        signal: null,
+        stderr: "bwrap not found: the lane jail needs bubblewrap (apt install bubblewrap); FUSION_JAIL=off disables it",
+        timedOut: false,
+        aborted: false,
+        spawnFailed: true,
+      };
+      return;
+    }
+    ({ cmd, args, env } = jailArgv(cmd, args, opts.jail, env, cwd));
+    cmd = config.bwrapPath;
+  }
+  const child = spawn(cmd, args, {
+    cwd,
+    env,
     stdio: [opts.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     detached: true, // own process group, so helpers the CLI spawns die with it
   });

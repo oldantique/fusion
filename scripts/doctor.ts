@@ -80,6 +80,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
     if (!good) failures++;
     console.log(`${good ? ok("✓") : bad("✗")} ${c.name.padEnd(7)} ${v.padEnd(28)} ${a}`);
   }
+  // The jail: bwrap must exist and be allowed to create namespaces on this host (not every
+  // kernel/distro permits unprivileged user namespaces).
+  const bw = await cliVersion("bwrap", ["--ro-bind", "/", "/", "true"]);
+  if (bw === null) {
+    failures++;
+    console.log(`${bad("✗")} bwrap   missing or cannot create a sandbox here — lanes will refuse to start (FUSION_JAIL=off to bypass)`);
+  } else {
+    console.log(`${ok("✓")} bwrap   ${(await cliVersion("bwrap", ["--version"]))?.padEnd(28)} sandbox works`);
+  }
   const sandbox = path.resolve(import.meta.dirname, "..", "data", "sandbox");
   const leaks = fs.existsSync(sandbox) ? fs.readdirSync(sandbox).filter((f) => /^(CLAUDE|AGENTS)\.md$|^\.claude$/.test(f)) : [];
   if (leaks.length) {

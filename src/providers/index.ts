@@ -23,6 +23,8 @@ export const claude: Provider = cliProvider({
   label: PROVIDER_LABELS.claude,
   streams: true,
   supportsJsonSchema: true,
+  // Writable: the OAuth refresh rewrites .credentials.json and the CLI updates .claude.json.
+  mounts: { rw: ["~/.claude", "~/.claude.json"] },
   build(opts) {
     // NEVER add --bare: it disables OAuth/keychain and would require an API key.
     const args = [
@@ -56,6 +58,7 @@ export const codex: Provider = cliProvider({
   label: PROVIDER_LABELS.codex,
   streams: false,
   supportsJsonSchema: false,
+  mounts: { rw: ["~/.codex"] },
   build(opts) {
     // stdin is "ignore" (== < /dev/null); without that codex blocks waiting on stdin.
     // Keep the default tool set: disabling tools via -c breaks the prompt cache and costs more.
@@ -84,6 +87,9 @@ export const kimi: Provider = cliProvider({
   label: PROVIDER_LABELS.kimi,
   streams: false,
   supportsJsonSchema: false,
+  // ~/.kimi-code holds the binary, its bundled rg/fd, credentials and sessions, so it is rw as a
+  // whole; the agent file lives in this repo and must be visible too.
+  mounts: { rw: ["~/.kimi-code"], ro: [KIMI_AGENT_FILE] },
   build(opts) {
     // Effort lives in ~/.kimi-code/config.toml ([thinking] effort); k3 defaults to high.
     // There is no per-call flag, so opts.effort cannot be honoured here.
@@ -104,9 +110,14 @@ export const grok: Provider = cliProvider({
   label: PROVIDER_LABELS.grok,
   streams: true,
   supportsJsonSchema: false,
+  mounts: { rw: ["~/.grok"] },
   build(opts) {
-    // --deny is the only effective tool block (--disallowed-tools is ignored).
+    // --deny is the only effective tool block (--disallowed-tools is ignored). This is the full
+    // set of valid prefixes (NotebookEdit is not one: the CLI exits 1); the model still *tries*
+    // read_file/run_terminal_command and is denied each time. The bwrap jail is the hard layer
+    // underneath, for the day a rule stops matching.
     // Do NOT use --system-prompt-override: it defeats the prompt cache and costs 2x.
+    const deny = ["Read(**)", "Glob(**)", "Grep(**)", "Bash(**)", "Write(**)", "Edit(**)", "WebFetch(**)", "WebSearch(**)"];
     return {
       cmd: "grok",
       args: [
@@ -116,12 +127,7 @@ export const grok: Provider = cliProvider({
         config.models.grok,
         "--reasoning-effort",
         opts.effort ?? config.effort,
-        "--deny",
-        "Write(**)",
-        "--deny",
-        "Edit(**)",
-        "--deny",
-        "Bash(**)",
+        ...deny.flatMap((d) => ["--deny", d]),
         "--disable-web-search",
         "--no-subagents",
         "--output-format",

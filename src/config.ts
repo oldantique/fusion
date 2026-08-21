@@ -2,6 +2,7 @@
  * Runtime configuration, read once from the environment. `.env` is loaded here, first thing, so
  * every entry point (server, scripts, tests) sees the same values without its own bootstrap.
  */
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadDotenv } from "./dotenv.ts";
@@ -31,6 +32,22 @@ function effort(name: string, raw: string | undefined, dflt: string): string {
   return v;
 }
 
+function onOff(name: string, v: string | undefined, dflt: boolean): boolean {
+  if (v === undefined || v === "") return dflt;
+  if (v !== "on" && v !== "off") throw new Error(`${name} must be "on" or "off", got "${v}"`);
+  return v === "on";
+}
+
+/** First `bwrap` on PATH, or null; the lane refuses to start unjailed when it is missing. */
+function findOnPath(name: string): string | null {
+  const { PATH = "" } = process.env;
+  for (const dir of PATH.split(path.delimiter).filter(Boolean)) {
+    const p = path.join(dir, name);
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 const PANEL_EFFORT = effort("FUSION_EFFORT", process.env.FUSION_EFFORT, "high");
 
 export const config = {
@@ -47,6 +64,12 @@ export const config = {
   password: process.env.FUSION_PASSWORD ?? "",
   cookieSecret: process.env.FUSION_COOKIE_SECRET ?? "",
 
+  /**
+   * Run every CLI inside a bubblewrap jail (see `jailArgv` in src/providers/process.ts). Off is
+   * only for bisecting a CLI that stopped working after an upgrade.
+   */
+  jail: onOff("FUSION_JAIL", process.env.FUSION_JAIL, true),
+  bwrapPath: findOnPath("bwrap"),
   laneTimeoutMs: int("LANE_TIMEOUT_SEC", 300, 1, 86_400) * 1000,
   /** Max attempts per panel lane (1 initial + retries); only transient failures are retried. */
   laneAttempts: 2,

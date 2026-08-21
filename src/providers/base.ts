@@ -1,6 +1,6 @@
 /** Generic CLI-backed provider: build argv, run, feed NDJSON into a parser, normalize errors. */
 import type { CallOptions, LaneErrorKind, LaneEvent, Provider, ProviderId } from "../types.ts";
-import { runLines, tryJson, type ProcessExit } from "./process.ts";
+import { runLines, tryJson, type JailMounts, type ProcessExit } from "./process.ts";
 import { config } from "../config.ts";
 
 export interface Invocation {
@@ -21,6 +21,13 @@ export interface CliProviderSpec {
   streams: boolean;
   supportsJsonSchema: boolean;
   build(opts: CallOptions): Invocation;
+  /**
+   * The only host paths the CLI sees inside its bwrap jail (its own state dir, typically); the
+   * OS, certs, DNS and the CLI's install are added by `jailArgv`. This list *is* the allowlist.
+   */
+  mounts: JailMounts;
+  /** Escape hatch for a CLI that cannot run jailed; loud in THREADS, never the default. */
+  jail?: boolean;
   parser(opts: CallOptions): Parser;
   /** Optional hook to pull text out of a non-JSON stdout line (e.g. kimi text mode). */
   plainLine?(line: string, parser: Parser): LaneEvent[];
@@ -48,7 +55,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
       // empty stderr, so non-JSON stdout lines are kept for the error message.
       const plain: string[] = [];
 
-      for await (const item of runLines({ cmd: inv.cmd, args: inv.args, stdin: inv.stdin, signal: opts.signal })) {
+      for await (const item of runLines({ cmd: inv.cmd, args: inv.args, stdin: inv.stdin, signal: opts.signal, jail: spec.jail === false ? undefined : spec.mounts })) {
         if (item.kind === "exit") {
           exit = item;
           break;
