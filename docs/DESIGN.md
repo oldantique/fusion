@@ -172,3 +172,19 @@ leaving bare letters in the UI: the prompt now forbids translating the token and
 accepts the translation and letter lists — still never a bare letter. "OpenRouter Fusion" above names the
 product that inspired the analysis format; this project does not use OpenRouter.
 
+## 2026-08-21 — Rendering: what may skip the sanitizer
+
+Answers now render LaTeX (KaTeX, with mhchem), mermaid diagrams, footnotes, and carry copy
+buttons for code blocks and whole answers — the ChatGPT-web baseline. All of it stays local
+(`scripts/build-vendor.ts`; `npm run check-docs` now rejects any remote URL under `web/`), and
+mermaid is a separate bundle fetched only when a diagram appears, because it outweighs
+everything else combined.
+
+The trust boundary is unchanged in spirit and is now stated: every byte of model output goes
+through DOMPurify; the only markup that bypasses it is KaTeX's own output for TeX that was
+lifted out *before* markdown (so `_` and `\` survive) and rendered with `throwOnError: false`,
+and mermaid SVG rendered at `securityLevel: strict` without HTML labels and then re-sanitised
+with the strict SVG profile. Diagrams are drawn only from finished text (a half-arrived fence
+cannot parse); a diagram that fails keeps its code visible. The pure extraction step lives in
+`web/math.js` so it can be unit-tested without a browser.
+

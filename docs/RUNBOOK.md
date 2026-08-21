@@ -59,6 +59,7 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | Synth badge says "Fallback: …" | Claude synthesis failed (often rate limit) | Answer still produced without analysis; check Claude usage |
 | Turn feels slow after all lanes are done | Synthesis runs after the slowest lane, at its own effort | Lower `FUSION_SYNTH_EFFORT` in `.env` (trade-off recorded in `docs/DESIGN.md`); each synthesizer attempt has a full lane timeout and the chain at most two |
 | UI blank after deploy | frontend bundle missing | `npm run build:vendor` |
+| Diagram shows as code, labelled "could not be drawn" | The model wrote invalid mermaid | Nothing to fix; the source stays readable |
 | Turn stuck "running" after a restart | Process died mid-turn | Marked failed automatically on next start; re-ask |
 | Server refuses to start naming env vars | `.env` missing or incomplete | Copy `.env.example` and fill it in |
 

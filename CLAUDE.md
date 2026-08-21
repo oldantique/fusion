@@ -81,3 +81,5 @@ turn in the terminal), `test`, `typecheck`, `check-docs`, `dev`.
 - `runLane` never rejects and `fuse()` takes its providers as an injectable dependency; keep it
   that way, the orchestration tests depend on it.
 - The synthesizer sees candidates as anonymized letters; names are mapped back only in the UI.
+- All model output is rendered through DOMPurify. The only markup allowed past it is KaTeX's own
+  output and re-sanitised mermaid SVG — see `render()` in `web/app.js`; never add a third.
