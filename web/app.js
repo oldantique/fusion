@@ -230,9 +230,13 @@ function paintAnalysis(view, analysis, letterMap) {
     return `<h4>${title}</h4><ul>${items.map((i) => `<li>${fmt(i)}</li>`).join("")}</ul>`;
   };
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  // The synthesizer is told to write "candidate X"; only that phrase is de-anonymized, so a bare
-  // "B" in ordinary prose (vitamin B, plan B) is left alone.
-  const deanon = (s) => esc(s).replace(/\bcandidates? ([A-H])\b/gi, (m, l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(labelOf(letterMap[l]))}</span>` : m));
+  // The synthesizer is told to write "candidate X"; only that phrase (and a letter list after it,
+  // "candidates B, C and D") is de-anonymized, so a bare "B" in ordinary prose (vitamin B, plan B)
+  // is left alone. "候选" is accepted too: models sometimes translate the token despite the prompt.
+  const one = (l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(labelOf(letterMap[l]))}</span>` : l);
+  const deanon = (s) =>
+    esc(s).replace(/(\b[Cc]andidates?|候选)\s*([A-H](?:\s*(?:[、,，/&]|and|和)\s*[A-H])*)(?![A-Za-z])/g, (m, word, letters) =>
+      `${word} ${letters.replace(/[A-H]/g, one)}`);
   view.analysisBody.innerHTML =
     section("Consensus", analysis.consensus, deanon) +
     section("Contradictions", analysis.contradictions, deanon) +
