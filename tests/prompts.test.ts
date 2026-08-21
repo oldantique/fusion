@@ -10,10 +10,21 @@ const lane = (provider: LaneResult["provider"], answer: string): LaneResult => (
 test("renderHistory drops oldest turns beyond the budget and reports the count", () => {
   const history = Array.from({ length: 5 }, (_, i) => ({ question: `q${i}`, answer: "x".repeat(1000) }));
   const r = renderHistory(history, 2500);
-  assert.equal(r.omitted, 3);
-  assert.match(r.text, /earliest 3 turns omitted/);
-  assert.match(r.text, /q3[\s\S]*q4/);
-  assert.doesNotMatch(r.text, /q2/);
+  // Trimming goes past the budget to 75% of it, so four blocks go rather than three.
+  assert.equal(r.omitted, 4);
+  assert.match(r.text, /earliest 4 turns omitted/);
+  assert.match(r.text, /q4/);
+  assert.doesNotMatch(r.text, /q3/);
+});
+
+test("after a trim, turns that fit in the slack do not trigger another one", () => {
+  const big = Array.from({ length: 5 }, (_, i) => ({ question: `q${i}`, answer: "x".repeat(1000) }));
+  const small = { question: "s", answer: "y".repeat(300) };
+  const first = renderHistory(big, 2500);
+  // The next two turns fit under the budget alongside the one kept block, so the preamble keeps
+  // starting at the same turn — which is what makes it reusable as a prompt-cache prefix.
+  assert.equal(renderHistory([...big, small], 2500).omitted, first.omitted);
+  assert.equal(renderHistory([...big, small, small], 2500).omitted, first.omitted);
 });
 
 test("renderHistory always keeps at least the latest turn", () => {

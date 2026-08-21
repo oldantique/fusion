@@ -62,6 +62,15 @@ export function escapeTagged(text: string): string {
 }
 
 /**
+ * Once over budget, trim down to this fraction of it rather than to the budget itself. This
+ * preamble is the prompt-cache prefix of every lane in the turn; trimming to exactly the budget
+ * puts the next turn over it again, so the prefix — and the cache — is lost on every single turn.
+ * Trimming in a block buys enough slack for several turns to reuse the same prefix, at the cost
+ * of a little context.
+ */
+const TRIM_TO = 0.75;
+
+/**
  * Render prior turns as a replayable preamble, trimming the oldest turns beyond the char budget.
  * The newest turn is always kept but hard-truncated if it alone exceeds the budget, so one huge
  * answer cannot blow up every later prompt. Returns the text and how many turns were dropped.
@@ -71,9 +80,12 @@ export function renderHistory(history: HistoryTurn[], budget = config.historyCha
   const blocks = history.map((t, i) => `### Q${i + 1}\n${escapeTagged(t.question.trim())}\n\n### Answer ${i + 1}\n${escapeTagged(t.answer.trim())}`);
   let start = 0;
   let total = blocks.reduce((n, b) => n + b.length, 0);
-  while (start < blocks.length - 1 && total > budget) {
-    total -= blocks[start]!.length;
-    start++;
+  if (total > budget) {
+    const target = budget * TRIM_TO;
+    while (start < blocks.length - 1 && total > target) {
+      total -= blocks[start]!.length;
+      start++;
+    }
   }
   const kept = blocks.slice(start);
   if (kept.length === 1 && kept[0]!.length > budget) kept[0] = kept[0]!.slice(0, budget) + "\n…[truncated]";
