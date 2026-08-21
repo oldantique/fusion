@@ -77,7 +77,8 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   defeats the prompt cache.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
-  Bash/Edit/WebSearch and can read and write anywhere. No effort flag (global config only). It is a
+  Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global
+  config only). It is a
   Node binary and needs the IPv4-fallback option that `childEnv()` appends; without it every call
   fails with an OAuth "fetch failed" on this host (interactive shells get it from `.bashrc`).
 - `claude --json-schema` output streams as `input_json_delta` fragments; the final object is in
