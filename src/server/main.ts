@@ -8,7 +8,7 @@ import { streamSSE } from "hono/streaming";
 import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
 import { Store } from "../store/db.ts";
 import { Jobs, ConflictError } from "./jobs.ts";
-import { ALL_PROVIDERS, PROVIDER_LABELS, type ProviderId } from "../types.ts";
+import { ALL_PROVIDERS, PROVIDER_LABELS, PROVIDER_CUTOFFS, type ProviderId } from "../types.ts";
 import { providers } from "../providers/index.ts";
 import { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } from "./auth.ts";
 
@@ -54,6 +54,7 @@ app.get("/api/providers", (c) =>
       label: PROVIDER_LABELS[id],
       model: config.models[id],
       streams: providers[id].streams,
+      cutoff: PROVIDER_CUTOFFS[id],
     })),
   ),
 );

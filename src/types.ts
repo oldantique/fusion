@@ -5,10 +5,26 @@ export type ProviderId = "claude" | "codex" | "kimi" | "grok";
 export const ALL_PROVIDERS: readonly ProviderId[] = ["claude", "codex", "kimi", "grok"] as const;
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
-  claude: "Claude Opus",
+  claude: "Claude Opus 5",
   codex: "GPT-5.6 Sol",
   kimi: "Kimi K3",
   grok: "Grok 4.6",
+};
+
+/**
+ * Vendor-stated knowledge cutoff of the model each label names, shown as a tooltip in the UI
+ * (the lanes run offline, so this is the edge of what they know). Home of this fact; verified
+ * 2026-08-21 against the vendors' model pages — re-check when a model in `.env` changes:
+ *   claude → Opus 5: platform.claude.com/docs/en/about-claude/models/overview
+ *   codex  → GPT-5.6 Sol: developers.openai.com/api/docs/models/gpt-5.6-sol
+ *   grok   → Grok 4.6: docs.x.ai/developers/grok-4-6
+ *   kimi   → K3: no cutoff published (model card, docs and tech report checked).
+ */
+export const PROVIDER_CUTOFFS: Record<ProviderId, string | null> = {
+  claude: "2026-05",
+  codex: "2026-02",
+  kimi: null,
+  grok: "2026-02",
 };
 
 /**

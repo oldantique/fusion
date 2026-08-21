@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- UI: a line under the model picks says every model answers offline and lists each one's
+  vendor-stated knowledge cutoff (home: `PROVIDER_CUTOFFS` in `src/types.ts`).
 - kimi runs with an empty tool set (`--agent-file`); it can no longer search the web or touch
   files, matching the other lanes.
 - `npm run check-updates`: three columns per CLI (last-verified / installed / latest) so an

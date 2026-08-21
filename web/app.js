@@ -308,9 +308,10 @@ function renderPicks() {
     cb.checked = saved ? saved.includes(p.id) : true;
     cb.addEventListener("change", () => { localStorage.setItem(PICK_KEY, JSON.stringify(pickedProviders())); $("#composer-note").textContent = ""; });
     label.append(cb, document.createTextNode(` ${p.label}`));
-    label.title = p.model + (p.streams ? " · streams" : "");
+    label.title = p.model + (p.streams ? " · streams" : "") + (p.cutoff ? ` · knowledge up to ${p.cutoff}` : " · knowledge cutoff not published");
     box.append(label);
   }
+  $("#cutoffs").textContent = state.providers.map((p) => `${p.label} ${p.cutoff ?? "(not published)"}`).join(" · ") + ".";
 }
 function pickedProviders() {
   return [...document.querySelectorAll("#provider-picks input:checked")].map((i) => i.value);
