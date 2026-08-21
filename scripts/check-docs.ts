@@ -7,6 +7,7 @@
  *  3. .env.example and src/config.ts agree on the set of environment variables
  *  4. every env var named in docs is declared in .env.example
  *  5. version-number-looking strings appear only in fixtures/README.md and CHANGELOG.md
+ *  6. web/ (outside vendor/) references no remote http(s) resource — every library is bundled locally
  *
  * Exported as a function so tests/docs.test.ts can run it under `npm test`.
  */
@@ -55,6 +56,12 @@ export function checkDocs(): string[] {
       for (const m of text.matchAll(/\b\d+\.\d+\.\d+\b/g)) {
         problems.push(`${doc}: version-like "${m[0]}" — versions belong in fixtures/README.md or CHANGELOG.md`);
       }
+    }
+  }
+  // 6. no CDN, ever: the frontend must work with no network beyond the Fusion server itself.
+  for (const f of fs.readdirSync(path.join(ROOT, "web")).filter((f) => /\.(html|js|css)$/.test(f))) {
+    for (const m of read(`web/${f}`).matchAll(/https?:\/\/[^\s"'`)<>]+/g)) {
+      problems.push(`web/${f}: remote reference ${m[0]} — bundle it via scripts/build-vendor.ts instead`);
     }
   }
   return problems;
