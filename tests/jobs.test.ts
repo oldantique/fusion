@@ -133,3 +133,65 @@ test("a degraded (unfused) answer persists its source lane", async () => {
   assert.equal(t.answer_provider, "kimi");
   assert.equal(t.synth_provider, null);
 });
+
+/**
+ * Compaction drops deltas but never a state-replacing event, which is what makes SSE resume safe:
+ * a client whose Last-Event-ID predates the compacted deltas still converges on the same state.
+ */
+test("a reconnect with a Last-Event-ID older than the compacted deltas still converges", async () => {
+  const store = new Store(":memory:");
+  const conv = store.createConversation("t");
+  const f = fakeFuse({ hang: true });
+  const jobs = new Jobs(store, f.impl);
+  const turnId = jobs.start(conv.id, "q", ["grok", "kimi"]);
+  await new Promise((r) => setTimeout(r, 20));
+
+  // The id a client would hold if its connection dropped mid-stream, while kimi was still typing.
+  const live: { seq: number; ev: JobEvent }[] = [];
+  jobs.subscribe(turnId, (e) => live.push(e));
+  const dropped = live.find((e) => e.ev.type === "lane" && e.ev.status === "delta" && e.ev.provider === "kimi")!;
+  f.release();
+  await jobs.drain(1_000);
+
+  const replay: JobEvent[] = [];
+  jobs.subscribe(turnId, (e) => replay.push(e.ev), dropped.seq);
+  assert.ok(!replay.some((e) => e.type === "lane" && e.status === "delta"), "the deltas it missed are gone");
+  const done = replay.find((e) => e.type === "lane" && e.status === "done" && e.provider === "kimi") as any;
+  assert.equal(done.result.answer, "K", "but the result carrying the same text is replayed in full");
+  assert.equal(replay.at(-1)!.type, "finished");
+});
+
+test("a reconnect during a synthesizer fallback replays the winning attempt, not the abandoned one", async () => {
+  const store = new Store(":memory:");
+  const conv = store.createConversation("t");
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  const result = { analysis: null, answer: "fused", provider: "grok" as const, ms: 1, letterMap: { A: "grok" as const, B: "kimi" as const } };
+  const jobs = new Jobs(store, async ({ onEvent }) => {
+    onEvent({ type: "lane", provider: "grok", status: "done", result: lane("grok", "G") });
+    onEvent({ type: "lane", provider: "kimi", status: "done", result: lane("kimi", "K") });
+    onEvent({ type: "synth", status: "start", provider: "claude", fallback: false });
+    onEvent({ type: "synth", status: "delta", text: "half an ans" });
+    await gate;
+    onEvent({ type: "synth", status: "start", provider: "grok", fallback: true });
+    onEvent({ type: "synth", status: "delta", text: "fused" });
+    onEvent({ type: "synth", status: "done", result });
+    return { lanes: [lane("grok", "G"), lane("kimi", "K")], synthesis: result, answer: "fused", answerProvider: null, historyOmitted: 0 };
+  });
+  const turnId = jobs.start(conv.id, "q", ["grok", "kimi"]);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const live: { seq: number; ev: JobEvent }[] = [];
+  jobs.subscribe(turnId, (e) => live.push(e));
+  const abandoned = live.find((e) => e.ev.type === "synth" && e.ev.status === "delta")!;
+  release();
+  await jobs.drain(1_000);
+
+  const replay: JobEvent[] = [];
+  jobs.subscribe(turnId, (e) => replay.push(e.ev), abandoned.seq);
+  assert.ok(!replay.some((e) => e.type === "synth" && e.status === "delta"), "both attempts' deltas are compacted");
+  const start = replay.find((e) => e.type === "synth" && e.status === "start") as any;
+  assert.equal(start.fallback, true, "the fallback start is replayed, so the UI resets the pane");
+  const done = replay.find((e) => e.type === "synth" && e.status === "done") as any;
+  assert.equal(done.result.answer, "fused");
+});
