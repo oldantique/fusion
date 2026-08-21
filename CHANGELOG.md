@@ -18,6 +18,13 @@
   their parent; graceful shutdown waits for running turns to cancel.
 - `.env` is loaded by every entry point (`npm run smoke` / `fuse` previously ran with defaults);
   integer settings are validated; `FUSION_HOST` now defaults to loopback.
+- Quota failures are shown as "rate limited" and not retried; the failure kind is stored with
+  the lane.
+- `FUSION_SYNTH_EFFORT` sets the synthesizer's effort separately from the panel.
+- Each synthesizer attempt gets its own timeout (the fallback no longer inherits a sliver);
+  the chain is capped at two lane timeouts.
+- Replayed history is trimmed in blocks so the prompt cache survives more turns.
+- `npm run fuse` prints the synthesizer's duration.
 - kimi lanes work under systemd (IPv4 fallback option passed to the child).
 
 ## 0.1.0 — 2026-08-20

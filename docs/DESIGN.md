@@ -3,7 +3,7 @@
 Dated, append-only record of *why* things are the way they are. Current behaviour is defined by
 the code (see the "where facts live" table in `CLAUDE.md`); if this file and the code disagree,
 the code is current and this file needs a new dated entry, not a silent edit. Open and deferred
-work is tracked in `THREADS.md`, not here.
+work is tracked in `docs/THREADS.md`, not here.
 
 ## 2026-08-20 — Initial design (settled in a design interview with the owner)
 
@@ -122,4 +122,50 @@ timeout and abort hooks stay armed until the child has actually exited.
 
 **Loopback by default.** `FUSION_HOST` defaults to the loopback address; LAN/Tailscale is an explicit
 opt-in documented as running without TLS. The earlier "bound to all interfaces" default is gone.
+
+## 2026-08-21 — Second review round, from the design record alone
+
+codex and kimi were given only this file (no code) and asked for a better architecture. Both
+independently rejected debate/critique rounds, pairwise judging, voting and adaptive lane
+routing as latency and quota spent on problems a single user does not have; both kept the
+stateless fused-only replay, the single synthesis call and the anonymised panel. What changed:
+
+**Rate limits are their own failure kind.** A quota block used to look like any non-zero exit:
+retried once (burning more of the exhausted quota) and shown as "failed". It is now
+`rate_limit` — from claude's `rate_limit_info` record when present, from the message text for
+the other CLIs (`classifyFailure` in `src/providers/base.ts`) — never retried, shown as "rate
+limited", and the kind is persisted with the lane so a reloaded turn paints the same badge.
+Conservative on purpose: an "overloaded" transient is treated the same way rather than retried.
+
+**The synthesizer has its own effort knob** (`FUSION_SYNTH_EFFORT`). The synthesis call sits
+serially after the slowest lane, so its effort is the largest single lever on turn latency.
+Measured once on a technical question: medium finished in roughly half the time of high and a
+blind comparison rated its answer noticeably but not clearly thinner. The default therefore
+stays equal to the panel effort; the owner trades it down per installation.
+
+**Synthesizer attempts get their own timeout, the chain is capped at two.** The previous "one
+shared lane-timeout for the whole chain" meant a slow first synthesizer left the fallback a
+sliver — the fallback was weakest exactly when needed. Now each attempt has a full lane timeout
+and the whole chain at most two, so the worst case after the panel is bounded and the fallback
+is real. Codex's wider ask for a total turn deadline was not taken: the per-lane timeout plus
+this cap already bounds a turn.
+
+**History trims in blocks.** The replayed history is the prompt-cache prefix for every lane.
+Trimming exactly to the budget rewrites that prefix on every later turn; trimming down to a
+fraction of the budget (`TRIM_TO` in `src/synth/prompts.ts`) leaves slack so the prefix holds
+for several turns — whenever the turns being added are smaller than the ones being dropped,
+which is the common case, not a guarantee. Summarisation (thread #4) remains the real cure.
+
+**SSE resume needs no snapshot.** Codex proposed snapshot events for reconnects that predate
+compacted deltas. Not needed: compaction removes only deltas, every state-replacing event
+(`running` attempt>1, lane `done`/`failed` with full text, `synth start`/`done`, `cancelled`,
+`finished`) stays, and an evicted job falls back to the persisted turn. A test pins this.
+
+**Rejected this round:** self-excluding the synthesizer's own candidate (loses a quarter of the
+panel for a bias that style recognition defeats anyway); per-turn random letter shuffle (the
+question-keyed one keeps retries stable); provider-aware token budgets (characters are enough
+for one user); execution "profiles" (lane ticking already is one). Recorded for v2 in
+`docs/THREADS.md`: confirming or re-synthesising an "Unfused" answer before it becomes history,
+and running the service under a dedicated OS account. "OpenRouter Fusion" above names the
+product that inspired the analysis format; this project does not use OpenRouter.
 

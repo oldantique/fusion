@@ -49,13 +49,15 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | kimi fails with "OAuth … fetch failed" only under the service, works in a shell | IPv6 half-connectivity; Node gives up before falling back to IPv4 | Already handled in `childEnv()` (`src/providers/process.ts`); if it recurs, check `curl -6` egress and the CLI's runtime |
 | Ask returns "turn in progress" / delete refused | That conversation already has a running turn | Wait or press Stop; one turn per conversation at a time |
 | Synth badge says "Unfused: …" | Every synthesizer failed; one lane's raw answer is shown | Read the lane errors; usually a Claude rate limit |
-| Lane fails with a terse or odd error, usually the same lane every time | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI; some CLIs do not say "quota") | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
+| Lane badge says "rate limited" | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI); not retried | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
+| Lane fails with a terse or odd error, usually the same lane every time | Usually the same quota exhaustion, from a CLI whose message does not say so | As above |
 | Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |
 | Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
 | Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
 | Fused answer or analysis ends mid-sentence / JSON invalid | Claude output cap reached (model-dependent default; CLI normally auto-continues) | See the `childEnv()` comment in `src/providers/process.ts` for the one knob |
 | Synth badge says "Fallback: …" | Claude synthesis failed (often rate limit) | Answer still produced without analysis; check Claude usage |
+| Turn feels slow after all lanes are done | Synthesis runs after the slowest lane, at its own effort | Lower `FUSION_SYNTH_EFFORT` in `.env` (trade-off recorded in `docs/DESIGN.md`); each synthesizer attempt has a full lane timeout and the chain at most two |
 | UI blank after deploy | frontend bundle missing | `npm run build:vendor` |
 | Turn stuck "running" after a restart | Process died mid-turn | Marked failed automatically on next start; re-ask |
 | Server refuses to start naming env vars | `.env` missing or incomplete | Copy `.env.example` and fill it in |

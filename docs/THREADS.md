@@ -12,14 +12,17 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 5 | codex via `app-server` daemon (token streaming, no cold start) | OPEN | Experimental API; unverified |
 | 6 | Raise codex concurrency after plan upgrade | BLOCKED-by-owner | Config only (`CODEX_MAX_CONCURRENCY`) |
 | 9 | Synthesizer via `claude --resume` (session memory) | ON-HOLD | v2 experiment only, behind a flag, with per-conversation letter mapping; rationale in `docs/DESIGN.md` |
-| 10 | Surface claude's `rate_limit_event` (five-hour window reset time, overage flag) in the UI | OPEN | Shape verified 2026-08-20: one event per call, position varies, only says `allowed`/reset time — low value until a non-allowed state is observed |
+| 10 | Show claude's rate-limit reset time / overage flag in the UI | OPEN | Since 2026-08-21 a non-allowed state is classified as `rate_limit` (badge "rate limited", not retried); `resetsAt` is parsed into parser state but not yet displayed |
 | 11 | Provider registry: one `PROVIDER_DEFS` table deriving the id union, labels, models, concurrency, semaphores, synth order | OPEN | v2; adding a 5th provider currently touches many files — do this first |
 | 12 | `Synthesizer` strategy + child table for synthesis attempts | OPEN | v2; today synthesis is a side capability of a panel provider (`supportsJsonSchema`) |
 | 13 | Versioned SQLite migrations | OPEN | v2; today: `CREATE IF NOT EXISTS` + idempotent `ALTER TABLE` in `src/store/db.ts` |
+| 14 | "Unfused" answer: confirm or re-synthesise before it is replayed as history | OPEN | v2; today it enters history like any answer (consistency argument in `docs/DESIGN.md`) — a "Retry synthesis" button is the likely shape |
+| 15 | Run the service and the CLIs under a dedicated OS account | OPEN | v2, ops; the only real containment available while kimi has no permission gate — needs each CLI's auth moved to that account |
 
 ## Archive
 
 - 2026-08-20 — v0.1.0 built, browser-QA'd (two rounds), tagged.
 - 2026-08-20 — systemd user unit installed and enabled (linger on); four-lane turn verified from the service environment.
 - 2026-08-20 — #8 closed: raw lane answers were in fact streamed since v0.1.0; the row was stale.
+- 2026-08-21 — Second codex/kimi review (design record only): rate-limit kind, synthesizer effort knob, per-attempt synth timeout, block trimming; rationale in `docs/DESIGN.md`.
 - 2026-08-20 — Lifecycle hardening from the codex/kimi review landed (SSE resume, classified retry, cancellation, process groups, per-conversation serialisation); rationale in `docs/DESIGN.md`.
