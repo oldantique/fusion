@@ -1,4 +1,5 @@
 # systemd *user* unit for Fusion.
+# Edit WorkingDirectory (and PATH, if your CLIs live elsewhere) to match your clone first.
 # Install:  mkdir -p ~/.config/systemd/user && cp deploy/fusion.service ~/.config/systemd/user/
 #           systemctl --user daemon-reload && systemctl --user enable --now fusion
 #           loginctl enable-linger $USER     # keep it running when you are logged out
@@ -10,8 +11,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/others/router
-# Same PATH the interactive shell has, so claude/codex/kimi/grok resolve.
+# %h is your home directory; change the rest to wherever you cloned Fusion.
+WorkingDirectory=%h/fusion
+# Same PATH the interactive shell has, so claude/codex/kimi/grok (and bwrap) resolve;
+# adjust to wherever your CLIs are installed.
 Environment=PATH=%h/.npm-global/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/env node --experimental-strip-types src/server/main.ts
 Restart=on-failure

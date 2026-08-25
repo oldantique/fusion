@@ -31,7 +31,7 @@ back) · `CHANGELOG.md` (`Unreleased` accumulates; a release turns it into a ver
 **Frozen — never edit in a sync:** `fixtures/*.ndjson` (captured CLI output — capture a new
 file instead) · `data/` (runtime, gitignored) · `.env` (secrets).
 
-**Memory** (`~/.claude/projects/-home-shawn-others-router/memory/`, outside git): preferences,
+**Memory** (Claude Code's per-project memory directory, outside git): preferences,
 workflow lessons and pointers only — nothing derivable from the repo. Update an existing file
 before creating one; delete wrong ones; relative → absolute dates; `MEMORY.md` indexes every
 file exactly once. No test reaches memory; check its paths by hand.

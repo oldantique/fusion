@@ -65,10 +65,11 @@ export function childEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessE
     // structured output ever truncates, whitelist that one variable here and set it in .env.
     env[k] = v;
   }
-  // kimi is a Node binary and this host has AAAA records but no IPv6 egress; Node's default
-  // per-family connect attempt (a fraction of a second) gives up before falling back to IPv4 and
-  // kimi's OAuth refresh fails with "fetch failed". The interactive shell sets the same option in
-  // ~/.bashrc, which is why the failure only shows up under systemd. Appended, never overriding.
+  // kimi is a Node binary, and on a host whose DNS answers AAAA while IPv6 egress is broken,
+  // Node's default per-family connect attempt (a fraction of a second) gives up before falling
+  // back to IPv4 and kimi's OAuth refresh fails with "fetch failed". Interactive shells often set
+  // the same option in ~/.bashrc, which is why the failure shows up only under systemd (or CI).
+  // Appended, never overriding.
   const autoselect = "--network-family-autoselection-attempt-timeout=3000";
   if (!env.NODE_OPTIONS?.includes("network-family-autoselection")) {
     env.NODE_OPTIONS = [env.NODE_OPTIONS, autoselect].filter(Boolean).join(" ");

@@ -29,7 +29,8 @@ work and before compacting.
 
 ## Conventions
 
-- Code, comments, docs, commits, UI copy: **English**. Conversation with the owner is in Chinese.
+- Code, comments, docs, commits, UI copy: **English**, always. (Spoken conversation with this
+  repo's owner happens in Chinese; none of it reaches disk.)
 - Node + TypeScript executed directly with type stripping: no syntax that needs transpiling
   (no enums, no parameter properties, no `import x = require`). `npm run typecheck` must stay clean.
 - Tests use `node:test`; parser tests replay captured CLI output from `fixtures/`. When a CLI's
@@ -65,9 +66,10 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   read a file outside it. The tool blocks below are the second layer, not the containment.
 - **Never pass `--bare` to claude** — it disables OAuth and would demand an API key. Anthropic
   says it will become the `-p` default; see THREADS #17 before every claude upgrade.
-- **claude on this account answers in Chinese by default** (account-level preference injected
-  by the CLI; no flag disables it). Only the emphatic language line in `src/synth/prompts.ts`
-  overrides it — verified for several languages. Do not soften it.
+- **A CLI can inject an account-level output language** that wins over the question's language:
+  claude does it for an account whose preference is set (observed with Chinese) and no flag
+  disables it. Only the emphatic language line in `src/synth/prompts.ts` overrides it — verified
+  for several languages. Do not soften it.
 - **codex** runs over one long-lived `codex app-server` daemon (`src/providers/codex-app-server.ts`,
   JSON-RPC over stdio; fresh ephemeral read-only thread per call; `turn/interrupt` for abort and
   timeout; a daemon that dies fails the turn with a retryable kind so the retry respawns it).
@@ -90,8 +92,10 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global
   config only). It is a
-  Node binary and needs the IPv4-fallback option that `childEnv()` appends; without it every call
-  fails with an OAuth "fetch failed" on this host (interactive shells get it from `.bashrc`).
+  Node binary and needs the IPv4-fallback option that `childEnv()` appends; on a host whose DNS
+  answers AAAA but has no working IPv6 egress, every call fails with an OAuth "fetch failed"
+  without it (an interactive shell usually gets the same option from `.bashrc`, which is why the
+  failure shows up only under the service).
 - The two CLIs with `--json-schema` stream it differently: claude sends the document as
   `input_json_delta` fragments, grok as ordinary `text_delta`s. Both end with the parsed object on
   `result.structured_output`, and `src/parsers/json-field-stream.ts` streams one field of it

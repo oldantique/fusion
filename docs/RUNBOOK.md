@@ -1,13 +1,13 @@
 # Fusion — Runbook
 
-Operational notes for the long-lived deployment on this machine. Settings and their defaults
+Operational notes for running Fusion as a long-lived service. Settings and their defaults
 live in `.env.example`; CLI invocation details live in `src/providers/`.
 
 ## Where things are
 
 | Thing | Location |
 |---|---|
-| Repo / working dir | `~/others/router` |
+| Repo / working dir | wherever you cloned it — the service unit's `WorkingDirectory` |
 | Runtime state (SQLite, sandbox dir, screenshots) | `data/` inside the repo (gitignored) |
 | Service unit | `deploy/fusion.service` (install steps in its header) |
 | Service logs | `journalctl --user -u fusion -f` |

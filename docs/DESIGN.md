@@ -54,8 +54,9 @@ own guidance asks that a single `auth.json` not be shared across concurrent jobs
 raise it (config) after upgrading the plan.
 
 **Language.** Answers must follow the question's language. Discovered during build: `claude -p`
-on this account answers in Chinese by default due to an account-level preference the CLI
-injects; only an emphatic system-prompt line overrides it (verified across several languages).
+answers in the account's preferred language by default (Chinese, on the account this was built
+against) due to a preference the CLI injects; only an emphatic system-prompt line overrides it
+(verified across several languages).
 
 **UI.** Plain ES modules, no framework; libs bundled locally (no CDN). Fused answer streamed on
 top, analysis panel, raw lanes collapsed with status and latency (raw lanes are not streamed —
@@ -198,7 +199,7 @@ what upstream publishes — and treats *installed newer than verified* as the re
 behind upstream is informational. It exits non-zero only under `--strict`, so it is cheap to run.
 
 Rejected: a `verified-versions.txt` baseline file and `verified/<cli>/<version>` git tags (the
-shape the sibling `~/others/opencode` sweep uses). Both are a second home for a fact
+shape a sibling project's upgrade sweep uses). Both are a second home for a fact
 `fixtures/README.md` already owns, and a second home is a second thing to drift; there is nothing
 to "mark" here because adding a fixtures row *is* the marking. Version comparison is also blind to
 a capability that appeared, so `--help-diff` keeps a committed per-CLI baseline of each
