@@ -53,11 +53,29 @@ async function run(
   providers: Partial<Record<ProviderId, Provider>>,
   ids: ProviderId[],
   signal?: AbortSignal,
-  extraDeps: { synthEffort?: string; synthTimeoutMs?: number } = {},
+  extraDeps: { synthEffort?: string; synthTimeoutMs?: number; staggerMs?: number } = {},
 ) {
   const events: FuseEvent[] = [];
-  const out = await fuse({ question: "q?", history: [], providerIds: ids, signal, onEvent: (e) => events.push(e) }, { providers, runLane, ...extraDeps });
+  // These tests are about the fallback chain, not about pacing; the stagger test opts back in.
+  const out = await fuse(
+    { question: "q?", history: [], providerIds: ids, signal, onEvent: (e) => events.push(e) },
+    { providers, runLane, staggerMs: 0, ...extraDeps },
+  );
   return { out, events };
+}
+
+/** Records when its panel call starts; answers the synthesis prompt without recording. */
+function timestamped(id: ProviderId, starts: { id: ProviderId; at: number }[]): Provider {
+  return {
+    id,
+    label: id,
+    streams: true,
+    supportsJsonSchema: false,
+    async *call(opts) {
+      if (!opts.prompt.includes("<candidate")) starts.push({ id, at: Date.now() });
+      yield { type: "done", text: `answer from ${id}` };
+    },
+  };
 }
 
 test("claude synthesizes with structured analysis when it works", async () => {
@@ -163,4 +181,28 @@ test("the whole synthesizer chain is capped at three lane timeouts (retry + fall
   assert.equal(out.answer, "claude-raw", "the best raw answer is shown instead");
   assert.ok(elapsed >= 140, `claude twice and grok once all ran (${elapsed}ms)`);
   assert.ok(elapsed < 200, `the chain was capped at 3x, not 4x (${elapsed}ms)`);
+});
+
+test("lanes start spaced out, in the order they were selected", async () => {
+  const starts: { id: ProviderId; at: number }[] = [];
+  const ids: ProviderId[] = ["claude", "grok", "kimi"];
+  const providers = Object.fromEntries(ids.map((id) => [id, timestamped(id, starts)]));
+  const stagger = 60;
+  const t0 = Date.now();
+  const { out } = await run(providers, ids, undefined, { staggerMs: stagger });
+
+  assert.deepEqual(starts.map((s) => s.id), ids, "lanes start in selection order");
+  // A timer can fire late but never early, so each lane's own slot is a safe lower bound.
+  starts.forEach((s, i) => assert.ok(s.at - t0 >= i * stagger - 5, `lane ${i} waited its slot (${s.at - t0}ms)`));
+  assert.equal(out.lanes.filter((l) => l.status === "done").length, ids.length, "every lane still ran");
+});
+
+test("stagger 0 fans out at once", async () => {
+  const starts: { id: ProviderId; at: number }[] = [];
+  const ids: ProviderId[] = ["claude", "grok", "kimi"];
+  const providers = Object.fromEntries(ids.map((id) => [id, timestamped(id, starts)]));
+  const t0 = Date.now();
+  await run(providers, ids, undefined, { staggerMs: 0 });
+  assert.equal(starts.length, ids.length);
+  assert.ok(starts.at(-1)!.at - t0 < 100, `no lane waited a stagger slot (${starts.at(-1)!.at - t0}ms)`);
 });

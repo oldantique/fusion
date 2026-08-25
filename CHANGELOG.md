@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Lanes start a fraction of a second apart instead of all at once, so a four-wide question no
+  longer arrives at any vendor as a burst (`LANE_STAGGER_MS`, 0 to disable). The turn is not
+  slower: the slowest lane still decides when it ends.
 - grok can synthesize: it takes `--json-schema` too, so a turn whose claude synthesizer fails
   now falls back to a *structured* second opinion — same merged answer, same consensus /
   contradictions / unique-insights / gaps analysis — instead of dropping to answer-only text.

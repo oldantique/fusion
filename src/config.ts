@@ -71,6 +71,13 @@ export const config = {
   jail: onOff("FUSION_JAIL", process.env.FUSION_JAIL, true),
   bwrapPath: findOnPath("bwrap"),
   laneTimeoutMs: int("LANE_TIMEOUT_SEC", 300, 1, 86_400) * 1000,
+  /**
+   * Delay between consecutive lane starts in a fan-out. A simultaneous four-wide burst is the
+   * shape that trips a per-second limiter, and grok's client gives up after two 429 retries;
+   * spacing the first request of each lane costs the turn nothing, because the slowest lane still
+   * sets its pace. 0 fires them all at once.
+   */
+  laneStaggerMs: int("LANE_STAGGER_MS", 300, 0, 10_000),
   /** Max attempts per panel lane (1 initial + retries); only transient failures are retried. */
   laneAttempts: 2,
   /** Pause before a retry, so a momentarily unhappy CLI/API is not hit again instantly. */

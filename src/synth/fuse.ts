@@ -5,7 +5,7 @@
  */
 import { config } from "../config.ts";
 import { providers as realProviders } from "../providers/index.ts";
-import { runLane as realRunLane } from "../providers/lane.ts";
+import { runLane as realRunLane, sleep } from "../providers/lane.ts";
 import type { Analysis, HistoryTurn, LaneResult, Provider, ProviderId, SynthesisResult } from "../types.ts";
 import { PANEL_SYSTEM, SYNTH_SCHEMA, SYNTH_SYSTEM, panelPrompt, renderHistory, synthPrompt } from "./prompts.ts";
 
@@ -47,6 +47,7 @@ export interface FuseDeps {
   /** Test injection only; production reads the configured values. */
   synthEffort?: string;
   synthTimeoutMs?: number;
+  staggerMs?: number;
 }
 
 /**
@@ -76,16 +77,22 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
   onEvent({ type: "history", omitted: rendered.omitted });
 
   const prompt = panelPrompt(question, rendered);
+  // Lanes start spaced out rather than all in the same instant: a simultaneous burst is what
+  // trips a per-second rate limiter, and grok's client gives up after two 429 retries. The wait
+  // is free in practice — the slowest lane, not the last to start, decides when the turn ends.
+  // Measured from one point rather than chained, so a slow spawn does not push the rest back.
+  const stagger = deps.staggerMs ?? config.laneStaggerMs;
   const settled = await Promise.allSettled(
-    ids.map((id) =>
-      runLane(providers[id]!, { prompt, system: PANEL_SYSTEM, signal }, (ev) => {
+    ids.map(async (id, i) => {
+      if (i > 0 && stagger > 0) await sleep(i * stagger, signal);
+      // An abort during the wait is not special-cased: runLane turns it into a failed lane.
+      const result = await runLane(providers[id]!, { prompt, system: PANEL_SYSTEM, signal }, (ev) => {
         if (ev.type === "status") onEvent({ type: "lane", provider: id, status: ev.status, attempt: ev.attempt, at: ev.at });
         else if (ev.type === "delta") onEvent({ type: "lane", provider: id, status: "delta", text: ev.text });
-      }).then((result) => {
-        onEvent({ type: "lane", provider: id, status: result.status === "done" ? "done" : "failed", result });
-        return result;
-      }),
-    ),
+      });
+      onEvent({ type: "lane", provider: id, status: result.status === "done" ? "done" : "failed", result });
+      return result;
+    }),
   );
   // runLane never rejects by contract; this keeps a violated contract from turning into a fatal turn.
   const lanes: LaneResult[] = settled.map((s, i) =>

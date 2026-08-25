@@ -305,3 +305,19 @@ is also why claude keeps the first slot in the synthesizer chain even though gro
 `--help` claims `--json-schema` implies `--output-format json`; an explicit `--output-format`
 still wins, so the schema run keeps streaming. Verified against the CLI, not the help text —
 `fixtures/grok-json-schema.ndjson` is that run.
+
+
+## 2026-08-25 — Staggered lane starts
+
+The fan-out fired every lane in the same instant, which is precisely the shape a per-second rate
+limiter is built to reject; grok's client makes it worse by giving up after two 429 retries, so a
+burst that a patient client would ride out costs the whole lane. Lanes now start a configurable
+moment apart (`LANE_STAGGER_MS`, `.env.example`), each measured from one point rather than chained
+off the previous start, so a slow spawn does not push the rest of the queue back.
+
+The cost is close to zero, which is why this is a default rather than an option: a turn ends when
+its *slowest* lane ends, not when its last lane starts, and the gap is orders of magnitude smaller
+than a model call. Rejected alternative: reacting to 429s instead of avoiding them — the retry
+budget belongs to the vendor's client, we cannot extend it, and by the time we see the error the
+lane has already burned its attempts. 0 disables the spacing for anyone who wants the old
+behaviour back while bisecting.
