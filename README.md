@@ -72,6 +72,8 @@ Threat model, what the jail does and does not contain, and how to report a vulne
 against stub providers, plus a docs consistency check), `npm run typecheck`, `npm run fuse -- "question"` for a full turn in the terminal,
 `npm run dev` for a watching server.
 
+Conventions, the checks a change must pass, and the fixture rule:
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 Design rationale: [`docs/DESIGN.md`](docs/DESIGN.md). Open work: [`docs/THREADS.md`](docs/THREADS.md).
 Agent guide (for Claude Code and friends): [`CLAUDE.md`](CLAUDE.md).
 
