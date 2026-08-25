@@ -16,12 +16,14 @@ hardcode a copy here. Everything on disk is English; chat is Chinese.
 
 `npm run check-docs` is the mechanical half of this pass (dangling script/path/env references,
 version numbers outside their home). It proves a reference *exists*, never that the sentence
-around it is still *true* — truth is what this pass checks.
+around it is still *true* — truth is what this pass checks. Numbers in prose (latencies, counts,
+quotas) are the same drift in a form it cannot see: state the property, point at the script or
+config that owns the value.
 
 ## Scope
 
-**Living (edit in place):** `CLAUDE.md` · `README.md` · `docs/RUNBOOK.md` · `docs/THREADS.md` ·
-`.env.example` (comments are the config documentation) · `fixtures/README.md` ·
+**Living (edit in place):** `CLAUDE.md` · `README.md` · `SECURITY.md` · `CONTRIBUTING.md` ·
+`.github/` templates · `docs/RUNBOOK.md` · `docs/THREADS.md` · `.env.example` (comments are the config documentation) · `fixtures/README.md` ·
 `deploy/fusion.service` header · file-header comments in `src/` and `scripts/` (this repo's
 convention: subsystem rules live in the code that implements them) · this skill.
 
@@ -40,17 +42,19 @@ file exactly once. No test reaches memory; check its paths by hand.
 
 - `check-docs-green` — `npm run check-docs` passes. If it names a problem, fix the doc (or move
   the fact to its home), never weaken the check to make it pass.
-- `code-owns-behaviour` — if `src/providers/`, `src/synth/`, `src/server/jobs.ts` or
-  `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
+- `code-owns-behaviour` — if `src/providers/`, `src/parsers/`, `src/synth/`, `src/server/jobs.ts`
+  or `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
   RUNBOOK failure-mode row and the newest DESIGN entry that describes that behaviour; a sentence
   that now contradicts the code is deleted or corrected, not annotated. Gotchas stay one-line
   claim + pointer.
 - `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run check-updates` lists
   installed-but-unverified CLIs and `--help-diff` shows new flags), `npm run smoke` must pass; a
   changed output format means a new fixture, a new row in `fixtures/README.md`, and parser + test
-  updates in the same commit. Premises that a CLI
-  upgrade can invalidate (no token deltas from codex/kimi; claude's Chinese default; grok's
-  ignored `--disallowed-tools`) are re-tested, not assumed.
+  updates in the same commit. Premises a CLI upgrade can invalidate are re-tested, not assumed:
+  no token deltas from kimi or `codex exec`; the account-language override; grok's
+  `--disallowed-tools` not being a block and its `--json-schema` streaming as text deltas;
+  codex's app-server schema (regenerated per version); `-p` not yet defaulting to `--bare`
+  (THREADS #17).
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads
   (mechanical) **and** each comment still describes the effect (by eye).
 - `events-match-ui` — the `FuseEvent`/`JobEvent` union in `src/synth/fuse.ts` and
@@ -61,9 +65,11 @@ file exactly once. No test reaches memory; check its paths by hand.
 - `design-appended` — if the code now does something DESIGN.md says it doesn't (or vice versa),
   add a dated entry; do not edit old entries.
 - `release-triple` — at a release, `package.json` `version`, the git tag and the newest
-  `CHANGELOG.md` heading are the same string and `Unreleased` is empty.
-- `no-set-sizes` — no latencies, token counts, quotas, test counts, port numbers or file lists
-  restated in prose; state the property and point at the script/config that owns the value.
+  `CHANGELOG.md` heading are the same string, `Unreleased` is empty, and the tag and a GitHub
+  release with the CHANGELOG section are pushed.
+- `no-owner-facts` — the repo is public: nothing in the living set states as project truth what
+  is only true of the owner's account, machine or paths ("this host", "this account", a clone
+  path); generalize the condition instead. Fixtures keep their captured paths (owner's call).
 - `propagate-premises` — when a load-bearing premise moves (a vendor's terms, a CLI gaining
   streaming, the synthesizer changing), grep the old claim across the living set + memory and
   fix every dependent sentence in one pass.
