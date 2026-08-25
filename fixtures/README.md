@@ -9,7 +9,7 @@ This file is the single home for *which CLI versions the parsers were verified a
 | 2026-08-20 | kimi 0.38.0 — same shapes as `kimi.ndjson`, verified by `npm run smoke` and a fresh capture; fixture unchanged |
 | 2026-08-21 | claude 2.1.238 — same event shapes as `claude.ndjson`, `--help` unchanged, Chinese default still holds; verified by `npm run smoke` and a fresh capture; fixture unchanged |
 | 2026-08-25 | grok 1.0.5 — same event shapes as `grok.ndjson`; `--help` only dropped the two cross-session-memory flags; `--disallowed-tools` is still not a block and the `--deny` prefix set is unchanged; verified by `npm run smoke` and a fresh capture; fixture unchanged |
-| 2026-08-25 | claude 2.1.243 — same event shapes as `claude.ndjson`, `--help` unchanged, the account-language override still yields to the prompt's language line; verified by `npm run smoke`, `npm run canary` and full fused turns; fixture unchanged |
+| 2026-08-25 | claude 2.1.245 — same event shapes as `claude.ndjson`, `--help` unchanged, the account-language override still yields to the prompt's language line; verified by `npm run smoke`, `npm run canary` and full fused turns; fixture unchanged |
 | 2026-08-25 | codex-cli 0.147.0 `app-server` — `codex-app-server.ndjson` captured over stdio JSON-RPC (v2 schema from `codex app-server generate-json-schema`), the default codex transport since then; `codex.ndjson` still covers the `exec` fallback |
 
 Files: `claude.ndjson` (default system prompt), `cmin.ndjson` (trimmed system prompt),
