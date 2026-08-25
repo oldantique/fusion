@@ -1,0 +1,32 @@
+# The three checks a change must pass, on a machine that has none of the vendor CLIs.
+# That is the point: the suite replays captured CLI output from fixtures/ and stubs the
+# providers, and the one test that needs bubblewrap skips itself when bwrap is absent — so CI
+# proves the repo is testable by someone who has installed nothing but Node.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Type stripping and node:sqlite; the floor is the engines field in package.json.
+          node-version: '22'
+          cache: npm
+
+      # postinstall bundles the frontend libraries with esbuild (a devDependency, installed
+      # here): no network beyond the registry, and a broken bundle step fails the install.
+      - run: npm ci
+
+      - run: npm test
+      - run: npm run typecheck
+      # Also runs inside npm test; kept separate so a docs drift failure is legible in the log.
+      - run: npm run check-docs
