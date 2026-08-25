@@ -1,14 +1,15 @@
 # Fusion
 
-Ask once, get an answer fused from several frontier models — **using the subscriptions you
-already pay for**, no API keys.
+Ask four frontier models at once and get one synthesized answer — locally, through the CLIs you
+already have logged in. No API keys, no proxy, no token extraction.
 
 Fusion fans a question out in parallel to the locally installed `claude`, `codex`, `kimi` and
-`grok` CLIs (each logged in with its normal subscription), then has Claude Opus merge the
-answers into one Markdown response and explain where the models disagreed. Every model answers
-offline — no web search or browsing — so answers reflect training knowledge, not the live web
-(why: `docs/DESIGN.md`). It runs as a small local web app; opening it to your LAN or Tailscale
-network is a one-line opt-in in `.env`.
+`grok` CLIs (each the vendor's own binary, logged in with its normal subscription, running in a
+sandbox), then has one of them merge the answers into a single Markdown response and say where
+the models disagreed. Every model answers offline — no web search or browsing — so answers
+reflect training knowledge, not the live web (why: `docs/DESIGN.md`). It runs as a small local
+web app with conversation history; opening it to your LAN or Tailscale network is a one-line
+opt-in in `.env`.
 
 ```
                  ┌─ claude ─────┐
@@ -17,6 +18,24 @@ question ──┬────►├─ codex ──────┼──► syn
            │     └─ grok  ──────┘
            └─ earlier fused answers replayed as context
 ```
+
+## How this compares
+
+The idea — a panel answers, a judge fuses — is the one behind OpenRouter's Fusion router and
+Karpathy's LLM Council. Fusion differs in where it runs and what it authenticates with.
+
+| | Fusion (this repo) | OpenRouter Fusion | llm-council and most API-based councils |
+|---|---|---|---|
+| Runs | on your machine | in OpenRouter's cloud | on your machine, calls go to OpenRouter |
+| Auth | each vendor's official CLI, already logged in | OpenRouter API key | OpenRouter API key |
+| Cost | your existing subscriptions | sum of every panel and judge completion | metered per token |
+| Models | whatever your `claude` / `codex` / `kimi` / `grok` are logged into | any OpenRouter slugs | any OpenRouter slugs |
+| Synthesis | one schema'd call: fused answer plus a structured disagreement analysis; candidates anonymized | panel → analyst → outer model, tool-gated (may skip deliberation) | answers → anonymous peer ranking → chairman |
+| Web access | off by design | on for the panel | whatever the models do |
+| Isolation | every CLI in a bubblewrap jail with a scrubbed environment (`npm run canary` proves it) | n/a | none |
+| History | SQLite; fused answers replayed as context | stateless API | JSON files |
+
+Not affiliated with OpenRouter or any of the vendors.
 
 ## Requirements
 
@@ -59,9 +78,18 @@ comment. Operations and troubleshooting: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ## Terms of service
 
-Personal, single-user use of the vendors' CLIs on a subscription is documented by them as
-intended. **Do not expose this UI to other people on your subscription** — that is the line both
-vendors draw; hence the mandatory password.
+Fusion stays on the side of the line the vendors draw: it spawns the **unmodified official
+CLI**, logged in by you, on your machine, for you. It never reads, stores or forwards an OAuth
+token, and it does not turn a subscription into an API for anyone else. Anthropic, OpenAI and
+xAI each document headless use of their own CLI by the subscriber; what they prohibit — and
+enforce — is lifting the token into another client or re-serving one login to many users.
+Hence the mandatory password and the single-user design: **do not expose this UI to other
+people on your subscription.**
+
+One exception you should know about: Kimi Code's community guidelines reserve its subscription
+for interactive use. Running that lane from Fusion is your call; the same `kimi` binary also
+runs on a pay-as-you-go platform key. Details and sources: the 2026-08-25 entry in
+[`docs/DESIGN.md`](docs/DESIGN.md).
 
 Threat model, what the jail does and does not contain, and how to report a vulnerability:
 [`SECURITY.md`](SECURITY.md).
