@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- grok can synthesize: it takes `--json-schema` too, so a turn whose claude synthesizer fails
+  now falls back to a *structured* second opinion — same merged answer, same consensus /
+  contradictions / unique-insights / gaps analysis — instead of dropping to answer-only text.
 - Every lane runs inside a bubblewrap jail that exposes only that CLI's own state directory;
   `npm run canary` proves no lane can read a file planted under HOME. `FUSION_JAIL=off` to
   bisect a CLI that stopped working after an upgrade. grok also gets the full `--deny` set.

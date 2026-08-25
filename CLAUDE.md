@@ -76,16 +76,20 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   list but never the shell one, and the model still reads files through it. Only effect-scoped
   `--deny 'Tool(**)'` rules stop a call, and not every tool name is a valid prefix (the CLI exits
   1 on an unknown one; the valid set is the list in its provider definition). Its
-  `streaming-messages-json` is wire-compatible with claude's stream. `--system-prompt-override`
-  defeats the prompt cache.
+  `streaming-messages-json` is wire-compatible with claude's stream, and `--json-schema` keeps
+  streaming in that format even though `--help` says it implies `--output-format json`.
+  `--system-prompt-override` defeats the prompt cache.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global
   config only). It is a
   Node binary and needs the IPv4-fallback option that `childEnv()` appends; without it every call
   fails with an OAuth "fetch failed" on this host (interactive shells get it from `.bashrc`).
-- `claude --json-schema` output streams as `input_json_delta` fragments; the final object is in
-  `result.structured_output`. `src/parsers/json-field-stream.ts` exists to stream one field of it.
+- The two CLIs with `--json-schema` stream it differently: claude sends the document as
+  `input_json_delta` fragments, grok as ordinary `text_delta`s. Both end with the parsed object on
+  `result.structured_output`, and `src/parsers/json-field-stream.ts` streams one field of it
+  either way. grok's schema is enforced by the prompt rather than the decoder, so the object can
+  fail to arrive — `structuredOutput()` in `src/parsers/anthropic-stream.ts` degrades instead.
 - Only *fused* answers are replayed as conversation history, never raw lane answers — except
   that a turn whose answer *is* one lane's answer (single lane, or every synthesizer failed) is
   replayed like any other turn. Changing that changes the product.

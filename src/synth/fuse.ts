@@ -50,17 +50,19 @@ export interface FuseDeps {
 }
 
 /**
- * Synthesizer preference order: claude first (the only one with --json-schema, hence analysis);
- * then grok because it streams and is the fastest lane, so a fallback is visible quickly; codex
- * last among the capable ones because it is the slowest and emits no deltas. The same order picks
- * the lane whose raw answer is shown when every synthesizer fails.
+ * Synthesizer preference order: claude first — it and grok both take --json-schema, but claude's
+ * schema is enforced by the decoder where grok's is enforced by the prompt, so claude's analysis
+ * is the one that always arrives; grok next, now a fully structured fallback rather than a
+ * plain-text one, and the fastest streaming lane so a fallback is visible quickly; codex last
+ * among the capable ones because it is the slowest and emits no deltas. The same order picks the
+ * lane whose raw answer is shown when every synthesizer fails.
  */
 export const SYNTH_ORDER: ProviderId[] = ["claude", "grok", "codex", "kimi"];
 /**
- * The preferred synthesizer gets a second attempt before the chain moves on: it is the only one
- * that produces the analysis, and its failures are mostly transient (a timeout on a heavy
- * question, an empty result). The fallbacks get one attempt each — by then the user has waited
- * long enough that a different model is a better bet than the same one a third time.
+ * The preferred synthesizer gets a second attempt before the chain moves on: it produces the
+ * analysis most dependably, and its failures are mostly transient (a timeout on a heavy question,
+ * an empty result). The fallbacks get one attempt each — by then the user has waited long enough
+ * that a different model is a better bet than the same one a third time.
  */
 export const SYNTH_CHAIN: ProviderId[] = [SYNTH_ORDER[0]!, ...SYNTH_ORDER];
 

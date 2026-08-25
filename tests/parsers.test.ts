@@ -60,6 +60,39 @@ test("claude --json-schema: streams the answer field and returns structured outp
   assert.equal(streamed, done.structured.answer);
 });
 
+test("grok --json-schema: the JSON arrives as text deltas, the answer field still streams", () => {
+  const p = createAnthropicStreamParser("answer");
+  const ev = run(p, "grok-json-schema.ndjson");
+  const streamed = ev.filter((e) => e.type === "delta").map((e: any) => e.text).join("");
+  const done = ev.at(-1) as any;
+  assert.equal(done.type, "done");
+  // The whole point of the field streamer: no braces reach the UI, and what streamed is the answer.
+  assert.ok(!streamed.includes('"answer"'), "the raw JSON document must not be streamed");
+  assert.equal(streamed, done.structured.answer);
+  assert.equal(done.text, done.structured.answer);
+  assert.equal(done.structured.analysis.unique_insights.length, 2);
+});
+
+test("a schema run with no structured_output degrades to the streamed field, never to raw JSON", () => {
+  const doc = JSON.stringify({ answer: "merged answer", analysis: { consensus: [] } });
+  const deltas = (text: string) => ({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text } } });
+  const p = createAnthropicStreamParser("answer");
+  for (const ch of doc) p.feed(deltas(ch));
+  // Same run, but the CLI reports no object — as a prompt-enforced schema may.
+  const done = p.feed({ type: "result", is_error: false, result: doc }).at(-1) as any;
+  assert.equal(done.type, "done");
+  assert.equal(done.text, "merged answer");
+  assert.deepEqual(done.structured, { answer: "merged answer", analysis: { consensus: [] } });
+});
+
+test("a schema run whose output is not JSON at all still yields the text it produced", () => {
+  const p = createAnthropicStreamParser("answer");
+  const done = p.feed({ type: "result", is_error: false, result: "I could not follow the schema." }).at(-1) as any;
+  assert.equal(done.type, "done");
+  assert.equal(done.text, "I could not follow the schema.");
+  assert.equal(done.structured, undefined);
+});
+
 test("codex exec --json: whole message at turn.completed", () => {
   const ev = run(createCodexParser(), "codex.ndjson");
   assert.equal(ev.length, 1);

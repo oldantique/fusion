@@ -282,3 +282,26 @@ jail and one more unversioned contract. Lane starts are staggered because grok's
 after two 429 retries and a simultaneous four-wide burst is the shape that trips per-second
 limiters. claude stays as is — the Agent SDK works with a subscription but wraps the same binary
 and is still alpha; the thing to watch is `--bare` becoming the `-p` default (thread #17).
+
+
+## 2026-08-25 — grok as a structured-output synthesizer
+
+Implementing thread #19 turned up one thing the review could not: the two CLIs that accept
+`--json-schema` do not stream it the same way. claude emits the document as `input_json_delta`
+fragments; grok emits it as ordinary `text_delta`s. Without that distinction a grok synthesis
+would have streamed raw JSON — braces and all — into the answer pane, so the parser now routes
+*both* delta kinds through the partial-field streamer whenever a schema is in play. Both CLIs
+still deliver the parsed object on `result.structured_output`, so nothing above the parser had to
+learn a second shape.
+
+The second difference is a guarantee, not a wire format. claude constrains the decoder to the
+schema; grok enforces it through the prompt, which means "no object" and "the wrong shape" are
+both reachable outcomes rather than impossible ones. Rather than fail the lane on them, the
+parser degrades: the object the CLI reported, else whatever reparses from the final text, else
+the text the field streamer had already decoded — a plain answer with a null analysis, which is
+exactly the degraded state `fuse()` already renders for the non-schema fallbacks. That asymmetry
+is also why claude keeps the first slot in the synthesizer chain even though grok is faster.
+
+`--help` claims `--json-schema` implies `--output-format json`; an explicit `--output-format`
+still wins, so the schema run keeps streaming. Verified against the CLI, not the help text —
+`fixtures/grok-json-schema.ndjson` is that run.

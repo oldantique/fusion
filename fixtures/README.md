@@ -11,7 +11,8 @@ This file is the single home for *which CLI versions the parsers were verified a
 | 2026-08-25 | grok 1.0.5 — same event shapes as `grok.ndjson`; `--help` only dropped the two cross-session-memory flags; `--disallowed-tools` is still not a block and the `--deny` prefix set is unchanged; verified by `npm run smoke` and a fresh capture; fixture unchanged |
 
 Files: `claude.ndjson` (default system prompt), `cmin.ndjson` (trimmed system prompt),
-`claude-json-schema.ndjson` (`--json-schema` run), `codex.ndjson`, `cx2.ndjson`
+`claude-json-schema.ndjson` and `grok-json-schema.ndjson` (`--json-schema` runs, the second
+with the real synthesizer schema), `codex.ndjson`, `cx2.ndjson`
 (`--experimental-json`, no deltas either), `kimi.ndjson`, `grok.ndjson`, `clean/` (grok probes
 for `--system-prompt-override` and `--disallowed-tools`).
 

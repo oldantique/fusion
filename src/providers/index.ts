@@ -109,34 +109,37 @@ export const grok: Provider = cliProvider({
   id: "grok",
   label: PROVIDER_LABELS.grok,
   streams: true,
-  supportsJsonSchema: false,
+  supportsJsonSchema: true,
   mounts: { rw: ["~/.grok"] },
   build(opts) {
-    // --deny is the only effective tool block (--disallowed-tools is ignored). This is the full
-    // set of valid prefixes (NotebookEdit is not one: the CLI exits 1); the model still *tries*
-    // read_file/run_terminal_command and is denied each time. The bwrap jail is the hard layer
-    // underneath, for the day a rule stops matching.
+    // --deny is the only effective tool block (--disallowed-tools leaves the shell tool in place).
+    // This is the full set of valid prefixes (NotebookEdit is not one: the CLI exits 1); the model
+    // still *tries* read_file/run_terminal_command and is denied each time. The bwrap jail is the
+    // hard layer underneath, for the day a rule stops matching.
     // Do NOT use --system-prompt-override: it defeats the prompt cache and costs 2x.
     const deny = ["Read(**)", "Glob(**)", "Grep(**)", "Bash(**)", "Write(**)", "Edit(**)", "WebFetch(**)", "WebSearch(**)"];
-    return {
-      cmd: "grok",
-      args: [
-        "-p",
-        inlineSystem(opts),
-        "-m",
-        config.models.grok,
-        "--reasoning-effort",
-        opts.effort ?? config.effort,
-        ...deny.flatMap((d) => ["--deny", d]),
-        "--disable-web-search",
-        "--no-subagents",
-        "--output-format",
-        "streaming-messages-json",
-        "--include-partial-messages",
-      ],
-    };
+    const args = [
+      "-p",
+      inlineSystem(opts),
+      "-m",
+      config.models.grok,
+      "--reasoning-effort",
+      opts.effort ?? config.effort,
+      ...deny.flatMap((d) => ["--deny", d]),
+      "--disable-web-search",
+      "--no-subagents",
+      "--output-format",
+      "streaming-messages-json",
+      "--include-partial-messages",
+    ];
+    // `--help` says --json-schema implies `--output-format json`; an explicit --output-format
+    // still wins, so the schema run keeps streaming (verified — fixtures/grok-json-schema.ndjson).
+    // The schema is enforced by prompt here, not by the decoder: the parser degrades rather than
+    // trusting the object to arrive.
+    if (opts.jsonSchema) args.push("--json-schema", JSON.stringify(opts.jsonSchema));
+    return { cmd: "grok", args };
   },
-  parser: () => createAnthropicStreamParser(),
+  parser: (opts) => createAnthropicStreamParser(opts.jsonSchema ? opts.streamField : undefined),
 });
 
 export const providers: Record<ProviderId, Provider> = { claude, codex, kimi, grok };
