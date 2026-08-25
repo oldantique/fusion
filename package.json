@@ -5,6 +5,27 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "author": "oldantique",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oldantique/fusion.git"
+  },
+  "homepage": "https://github.com/oldantique/fusion#readme",
+  "bugs": {
+    "url": "https://github.com/oldantique/fusion/issues"
+  },
+  "keywords": [
+    "llm",
+    "multi-model",
+    "ensemble",
+    "self-hosted",
+    "claude-code",
+    "codex",
+    "kimi",
+    "grok",
+    "cli",
+    "sse"
+  ],
   "engines": {
     "node": ">=22.13"
   },
