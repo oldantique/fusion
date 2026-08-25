@@ -22,7 +22,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 
 ## Archive
 
-- 2026-08-25 — #20 closed: v0.2.0 tagged for the public release — README positioning and screenshot, SECURITY.md, CONTRIBUTING.md, CI, de-account pass; what remains is pushing the repo and turning on GitHub advisories.
+- 2026-08-25 — #20 closed: v0.2.0 tagged for the public release — README positioning and screenshot, SECURITY.md, CONTRIBUTING.md, CI, de-account pass; published at https://github.com/oldantique/fusion with CI green, private vulnerability reporting on and a GitHub release.
 - 2026-08-25 — #19 closed: grok upgraded and re-verified, `--json-schema` wired up so it
   synthesizes with the full analysis, and lane starts staggered (`LANE_STAGGER_MS`); ACP
   long-lived mode (`grok agent stdio`) rejected for now — rationale in `docs/DESIGN.md`.
