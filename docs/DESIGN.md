@@ -252,3 +252,33 @@ read it through the real `runLane`, and fails on a quote. `FUSION_JAIL=off` exis
 CLI that stops working after an upgrade; a missing `bwrap` fails the lane rather than running it
 unjailed, because silently losing the property is the one outcome the switch must never produce.
 
+
+## 2026-08-25 — Subscription terms and programmatic-surface review
+
+A researched pass (primary sources, all four vendors, August 2026) on whether "subscription as
+API" has a better-sanctioned shape than spawning the official CLI headlessly. Findings that
+decide things here: Anthropic, OpenAI and xAI each *document* headless use of their own CLI on
+a personal subscription (Anthropic's headless page and `setup-token`; OpenAI's non-interactive
+mode page plus a public statement that Sign-in-with-ChatGPT through official or open-source
+clients is fine and only re-serving a subscription to many users is fraud-flagged; xAI's launch
+post advertising `-p` for scripts, and its AUP now forbidding only *unauthorized* automation).
+What all three prohibit is what the third-party bridge gateways do: lift the OAuth token, forge
+the client, serve it to others — with real enforcement (Anthropic suspensions and a legal
+request to a harness project; xAI risk-scoring the token). So the architecture stays: unmodified
+official binaries, official login, one person. Moonshot is the exception: Kimi Code's community
+guidelines reserve the subscription for interactive use and name scripted execution as out of
+scope, with suspension as the remedy. The owner chose to keep the lane on the subscription
+(thread #18); the documented exit is a pay-as-you-go platform key on the same binary.
+
+Interface decisions from the same pass. codex moves to `app-server` (thread #5): it is the
+slowest lane, `exec --json` is the only surface with no schema artifact and a history of silent
+renames, and app-server ships checked-in JSON schemas, a long-lived process, `turn/interrupt`
+and rate-limit introspection; a single serialised daemon also satisfies OpenAI's
+one-`auth.json`-per-stream rule better than N processes. grok stays on `-p`: its stream is
+wire-compatible with claude's, `--json-schema` does work (the earlier `supportsJsonSchema:
+false` was wrong, thread #19), and it is the fastest lane, so a long-lived ACP session
+(`grok agent stdio`) would buy little cold-start and cost a protocol layer, a daemon inside the
+jail and one more unversioned contract. Lane starts are staggered because grok's client gives up
+after two 429 retries and a simultaneous four-wide burst is the shape that trips per-second
+limiters. claude stays as is — the Agent SDK works with a subscription but wraps the same binary
+and is still alpha; the thing to watch is `--bare` becoming the `-p` default (thread #17).

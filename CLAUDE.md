@@ -63,13 +63,15 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
 - **All CLIs run inside a bwrap jail** (`jailArgv` in `src/providers/process.ts`); each provider's
   `mounts` list in `src/providers/index.ts` is the allowlist; `npm run canary` proves no lane can
   read a file outside it. The tool blocks below are the second layer, not the containment.
-- **Never pass `--bare` to claude** — it disables OAuth and would demand an API key.
+- **Never pass `--bare` to claude** — it disables OAuth and would demand an API key. Anthropic
+  says it will become the `-p` default; see THREADS #17 before every claude upgrade.
 - **claude on this account answers in Chinese by default** (account-level preference injected
   by the CLI; no flag disables it). Only the emphatic language line in `src/synth/prompts.ts`
   overrides it — verified for several languages. Do not soften it.
 - **codex** blocks on an open stdin; no token deltas; disabling its tools defeats the prompt
   cache and costs more — keep the default tool set. It is the slowest lane and its concurrency
-  cap defaults to one (OpenAI asks that one `auth.json` not be shared across concurrent jobs).
+  cap defaults to one (OpenAI's CI/CD auth docs: one `auth.json` per serialised stream — a
+  token-refresh durability rule, not a licence term).
 - **grok** ignores `--disallowed-tools`; only effect-scoped `--deny 'Tool(**)'` rules work, and
   not every tool name is a valid prefix (the CLI rejects unknown ones at startup; the valid set
   is the list in its provider definition). Its
