@@ -38,6 +38,12 @@ function onOff(name: string, v: string | undefined, dflt: boolean): boolean {
   return v === "on";
 }
 
+function oneOf<T extends string>(name: string, v: string | undefined, allowed: readonly T[], dflt: T): T {
+  if (v === undefined || v === "") return dflt;
+  if (!allowed.includes(v as T)) throw new Error(`${name} must be one of ${allowed.join("|")}, got "${v}"`);
+  return v as T;
+}
+
 /** First `bwrap` on PATH, or null; the lane refuses to start unjailed when it is missing. */
 function findOnPath(name: string): string | null {
   const { PATH = "" } = process.env;
@@ -71,6 +77,12 @@ export const config = {
   jail: onOff("FUSION_JAIL", process.env.FUSION_JAIL, true),
   bwrapPath: findOnPath("bwrap"),
   laneTimeoutMs: int("LANE_TIMEOUT_SEC", 300, 1, 86_400) * 1000,
+  /**
+   * How the codex lane talks to the CLI: a long-lived `codex app-server` daemon (default; see
+   * src/providers/codex-app-server.ts) or one `codex exec` process per call (the older path,
+   * kept for bisecting a daemon problem after a CLI upgrade).
+   */
+  codexTransport: oneOf("CODEX_TRANSPORT", process.env.CODEX_TRANSPORT, ["app-server", "exec"] as const, "app-server"),
   /** Max attempts per panel lane (1 initial + retries); only transient failures are retried. */
   laneAttempts: 2,
   /** Pause before a retry, so a momentarily unhappy CLI/API is not hit again instantly. */

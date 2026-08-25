@@ -9,6 +9,7 @@ import { createCodexParser, createKimiParser } from "../parsers/whole-message.ts
 import type { CallOptions, Provider, ProviderId } from "../types.ts";
 import { PROVIDER_LABELS } from "../types.ts";
 import { cliProvider } from "./base.ts";
+import { CODEX_MOUNTS, codexAppServer } from "./codex-app-server.ts";
 
 /** Providers without a system-prompt flag get it prepended to the user prompt. */
 /** Agent definition that strips kimi's tool set; see the kimi provider below. */
@@ -53,12 +54,16 @@ export const claude: Provider = cliProvider({
   parser: (opts) => createAnthropicStreamParser(opts.jsonSchema ? opts.streamField : undefined),
 });
 
-export const codex: Provider = cliProvider({
+/**
+ * The per-call `codex exec` path, selected by CODEX_TRANSPORT=exec. The default is the
+ * app-server daemon in ./codex-app-server.ts; this stays as the bisecting fallback.
+ */
+export const codexExec: Provider = cliProvider({
   id: "codex",
   label: PROVIDER_LABELS.codex,
   streams: false,
   supportsJsonSchema: false,
-  mounts: { rw: ["~/.codex"] },
+  mounts: CODEX_MOUNTS,
   build(opts) {
     // stdin is "ignore" (== < /dev/null); without that codex blocks waiting on stdin.
     // Keep the default tool set: disabling tools via -c breaks the prompt cache and costs more.
@@ -81,6 +86,8 @@ export const codex: Provider = cliProvider({
   },
   parser: () => createCodexParser(),
 });
+
+export const codex: Provider = config.codexTransport === "exec" ? codexExec : codexAppServer;
 
 export const kimi: Provider = cliProvider({
   id: "kimi",
