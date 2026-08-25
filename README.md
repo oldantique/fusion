@@ -19,6 +19,8 @@ question ──┬────►├─ codex ──────┼──► syn
            └─ earlier fused answers replayed as context
 ```
 
+![Fusion after one question](docs/screenshot.png)
+
 ## How this compares
 
 The idea — a panel answers, a judge fuses — is the one behind OpenRouter's Fusion router and
