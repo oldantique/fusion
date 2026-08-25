@@ -63,6 +63,9 @@ Personal, single-user use of the vendors' CLIs on a subscription is documented b
 intended. **Do not expose this UI to other people on your subscription** — that is the line both
 vendors draw; hence the mandatory password.
 
+Threat model, what the jail does and does not contain, and how to report a vulnerability:
+[`SECURITY.md`](SECURITY.md).
+
 ## Development
 
 `npm test` (parser tests replay captured CLI output from `fixtures/`, orchestration tests run
