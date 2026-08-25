@@ -51,7 +51,7 @@ Please report privately, not as a public issue:
 
 - GitHub → the repository's **Security** tab → *Report a vulnerability* (private advisory):
   <https://github.com/oldantique/fusion/security/advisories/new>
-- or email: `TODO-maintainer-email`
+- or email: ccmuuc@163.com
 
 Include the version or commit, what you did, and what you got. This is a personal project
 maintained in someone's spare time: expect a reply in days, not hours, and no bounty.

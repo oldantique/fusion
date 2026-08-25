@@ -1,6 +1,6 @@
 {
   "name": "fusion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-hosted multi-model fusion over local subscription CLIs (claude, codex, kimi, grok)",
   "type": "module",
   "private": true,

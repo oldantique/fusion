@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 — 2026-08-25
+
 - Prepared for public release: `SECURITY.md` (threat model, what the jail contains, how to report
   a vulnerability), `CONTRIBUTING.md` (the three checks, the fixture rule, one-fact-one-home),
   a CI workflow running `test` / `typecheck` / `check-docs` on a runner with none of the vendor
