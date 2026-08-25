@@ -9,7 +9,6 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 | 2 | "Allow web search" toggle per question | OPEN | Since 2026-08-21 every lane is offline by a hard flag (kimi via `--agent-file`, see `docs/DESIGN.md`); the toggle must open all four together |
 | 3 | Per-lane retry button | OPEN | Backend retries transient failures once automatically |
 | 4 | History summarization when budget exceeded | OPEN | Currently oldest turns are dropped |
-| 5 | codex via `app-server` daemon (no cold start, versioned JSON-RPC schema, `turn/interrupt`) | IN-PROGRESS | Decided 2026-08-25 after the terms/interface review (`docs/DESIGN.md`); spike + implementation on a branch, old `exec` path stays behind a switch |
 | 6 | Raise codex concurrency after plan upgrade | BLOCKED-by-owner | Config only (`CODEX_MAX_CONCURRENCY`) |
 | 9 | Synthesizer via `claude --resume` (session memory) | ON-HOLD | v2 experiment only, behind a flag, with per-conversation letter mapping; rationale in `docs/DESIGN.md` |
 | 10 | Show claude's rate-limit reset time / overage flag in the UI | OPEN | Since 2026-08-21 a non-allowed state is classified as `rate_limit` (badge "rate limited", not retried); `resetsAt` is parsed into parser state but not yet displayed |
@@ -26,6 +25,7 @@ thread moves. Finished threads go to Archive with a one-line outcome — never d
 - 2026-08-25 — #19 closed: grok upgraded and re-verified, `--json-schema` wired up so it
   synthesizes with the full analysis, and lane starts staggered (`LANE_STAGGER_MS`); ACP
   long-lived mode (`grok agent stdio`) rejected for now — rationale in `docs/DESIGN.md`.
+- 2026-08-25 — #5 closed: codex runs over one `codex app-server` daemon per service process (`src/providers/codex-app-server.ts`): no cold start per call, streamed deltas, interruptible turns, per-turn usage; `CODEX_TRANSPORT=exec` keeps the old path for bisecting; rationale in `docs/DESIGN.md`.
 - 2026-08-21 — #15 (dedicated OS account) closed: superseded by the bwrap jail — every lane runs in a mount namespace that exposes only its own state dir; `npm run canary` is the proof; rationale in `docs/DESIGN.md`.
 - 2026-08-20 — v0.1.0 built, browser-QA'd (two rounds), tagged.
 - 2026-08-20 — systemd user unit installed and enabled (linger on); four-lane turn verified from the service environment.

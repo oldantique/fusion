@@ -9,12 +9,15 @@ This file is the single home for *which CLI versions the parsers were verified a
 | 2026-08-20 | kimi 0.38.0 — same shapes as `kimi.ndjson`, verified by `npm run smoke` and a fresh capture; fixture unchanged |
 | 2026-08-21 | claude 2.1.238 — same event shapes as `claude.ndjson`, `--help` unchanged, Chinese default still holds; verified by `npm run smoke` and a fresh capture; fixture unchanged |
 | 2026-08-25 | grok 1.0.5 — same event shapes as `grok.ndjson`; `--help` only dropped the two cross-session-memory flags; `--disallowed-tools` is still not a block and the `--deny` prefix set is unchanged; verified by `npm run smoke` and a fresh capture; fixture unchanged |
+| 2026-08-25 | codex-cli 0.147.0 `app-server` — `codex-app-server.ndjson` captured over stdio JSON-RPC (v2 schema from `codex app-server generate-json-schema`), the default codex transport since then; `codex.ndjson` still covers the `exec` fallback |
 
 Files: `claude.ndjson` (default system prompt), `cmin.ndjson` (trimmed system prompt),
 `claude-json-schema.ndjson` and `grok-json-schema.ndjson` (`--json-schema` runs, the second
 with the real synthesizer schema), `codex.ndjson`, `cx2.ndjson`
-(`--experimental-json`, no deltas either), `kimi.ndjson`, `grok.ndjson`, `clean/` (grok probes
-for `--system-prompt-override` and `--disallowed-tools`).
+(`--experimental-json`, no deltas either), `codex-app-server.ndjson` (one turn over
+`codex app-server`: server lines verbatim, the client's own requests kept as `# client>` lines so
+`tests/codex-app-server.test.ts` can replay the exchange request by request), `kimi.ndjson`,
+`grok.ndjson`, `clean/` (grok probes for `--system-prompt-override` and `--disallowed-tools`).
 
 When a CLI upgrade changes its output, capture a new file with the flags from
 `src/providers/index.ts`, add a row above, and adjust the parser + tests. Do not edit old captures.

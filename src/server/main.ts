@@ -10,6 +10,7 @@ import { Store } from "../store/db.ts";
 import { Jobs, ConflictError } from "./jobs.ts";
 import { ALL_PROVIDERS, PROVIDER_LABELS, PROVIDER_CUTOFFS, type ProviderId } from "../types.ts";
 import { providers } from "../providers/index.ts";
+import { codexDaemon } from "../providers/codex-app-server.ts";
 import { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } from "./auth.ts";
 
 // Relative paths (static root, anything a library resolves against cwd) must not depend on where
@@ -174,6 +175,8 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
     // failStaleTurns() on the next start covers anything that did not make it.
     const clean = await jobs.drain(5_000);
     if (!clean) console.warn("shutdown: some turns did not finish within the grace period");
+    // The jailed daemon dies with us (--die-with-parent); this covers FUSION_JAIL=off.
+    codexDaemon.shutdown();
     store.close();
     process.exit(0);
   });
