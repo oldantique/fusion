@@ -72,9 +72,10 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   cache and costs more — keep the default tool set. It is the slowest lane and its concurrency
   cap defaults to one (OpenAI's CI/CD auth docs: one `auth.json` per serialised stream — a
   token-refresh durability rule, not a licence term).
-- **grok** ignores `--disallowed-tools`; only effect-scoped `--deny 'Tool(**)'` rules work, and
-  not every tool name is a valid prefix (the CLI rejects unknown ones at startup; the valid set
-  is the list in its provider definition). Its
+- **grok**'s `--disallowed-tools` is not a block: it trims some names from the advertised tool
+  list but never the shell one, and the model still reads files through it. Only effect-scoped
+  `--deny 'Tool(**)'` rules stop a call, and not every tool name is a valid prefix (the CLI exits
+  1 on an unknown one; the valid set is the list in its provider definition). Its
   `streaming-messages-json` is wire-compatible with claude's stream. `--system-prompt-override`
   defeats the prompt cache.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
