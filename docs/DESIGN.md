@@ -252,3 +252,36 @@ read it through the real `runLane`, and fails on a quote. `FUSION_JAIL=off` exis
 CLI that stops working after an upgrade; a missing `bwrap` fails the lane rather than running it
 unjailed, because silently losing the property is the one outcome the switch must never produce.
 
+
+### 2026-08-25 — codex over `app-server` instead of one `exec` per call
+
+`codex exec --json` was the slowest lane and the worst contract: a cold start on every call
+(about half of a trivial lane's time, `npm run smoke`), an output shape that is not versioned and
+has changed under us once, and cancellation only by killing the process. Three candidates for a
+better surface. `@openai/codex-sdk` is the official TypeScript package, but it is a thin wrapper
+that spawns `codex exec --experimental-json` per call: same cold start, no interrupt, and the
+only way into our jail would be pointing its executable override at a bwrap wrapper script —
+rejected as a second copy of `jailArgv`. `codex mcp-server` exposes codex as a tool, the wrong
+shape for a lane. `codex app-server` is JSON-RPC over stdio with a generated, checked-in schema
+(`codex app-server generate-json-schema`), a long-lived process, `turn/interrupt`, per-turn
+token usage and typed error codes; and it runs inside the existing jail unchanged. A spike
+measured the warm turn at roughly half of exec's, confirmed the interrupt leaves the daemon
+usable, and confirmed a read-only sandbox with network off plus `web_search = "disabled"`
+(the sandbox does not cover the server-side search tool) and no session written to disk.
+
+Shape: one daemon per service process, spawned on the first call, stopped after idling, jailed
+by the same `jailArgv` and mount list as before (the containment property must not depend on
+the transport). Each call is a fresh `ephemeral` thread — the server can keep threads, but
+conversation memory is the synthesizer's job and lives in the prompt (history policy in
+`src/synth/prompts.ts`); a shared thread would leak between conversations and drift from what the
+other lanes see. The system prompt goes in as `developerInstructions` rather than inlined into
+the user text, since the protocol has a slot for it. Failure rules: a daemon death mid-turn is
+the retryable `exit` kind, so `runLane`'s single retry is also the respawn; an interrupt the
+server never acknowledges kills the daemon after a short grace rather than leaving a lane hung
+past its timeout; a spawn failure is `spawn`, not retried. The daemon's stdio is unref'd between
+turns so `smoke`, `canary` and `fuse` exit without knowing about it. The exec path stays behind
+`CODEX_TRANSPORT=exec` because a codex upgrade can break one transport and not the other, and
+bisecting needs both. One daemon serializing every codex turn also satisfies OpenAI's
+one-`auth.json`-per-stream request more literally than N concurrent exec processes did; the
+concurrency cap of one is unchanged. The `Provider` interface did not need to change: `call()`
+was already an async generator, which is all a non-spawn-per-call provider needs.

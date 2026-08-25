@@ -41,7 +41,9 @@ hand and noted in `CHANGELOG.md`.
 `fixtures/README.md` records, and `--help-diff` shows the flags that appeared since the committed
 `fixtures/help/` baselines (`--help-diff --update` re-baselines once you have re-verified).
 Then `npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` with the flags in
-`src/providers/index.ts` and compare its output to `fixtures/`. If the format changed: capture a
+`src/providers/index.ts` and compare its output to `fixtures/` (for codex the daemon protocol is
+in `src/providers/codex-app-server.ts` and `codex app-server generate-json-schema --out DIR`
+prints the schema the new build speaks; diff it against the fields that file reads). If the format changed: capture a
 new fixture, record the version in `fixtures/README.md`, adjust the parser, add a test.
 
 ## Failure modes
@@ -58,6 +60,9 @@ new fixture, record the version in `fixtures/README.md`, adjust the parser, add 
 | A lane fails after a CLI upgrade with a missing-file / ENOENT / permission error | The new build wants a path the jail does not expose | Bisect with `FUSION_JAIL=off` in `.env` (restart); if the lane works unjailed, add the path to that provider's `mounts` in `src/providers/index.ts`, turn the jail back on, re-run `npm run smoke` and `npm run canary` |
 | Every lane fails at once with "bwrap not found" | bubblewrap missing, or the service's PATH does not include it | `apt install bubblewrap`; `npm run doctor` checks it can create a sandbox on this kernel |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |
+| codex fails with "codex app-server exited … (mid-turn)" and the next attempt works | The app-server daemon died (crash, OOM, or a codex upgrade underneath a running daemon); the retry respawns it | Nothing if it is rare; if it repeats, run `codex app-server` by hand from `data/sandbox/` to see its stderr, or switch to `CODEX_TRANSPORT=exec` in `.env` (restart) to bisect |
+| codex fails with "codex app-server failed to start" on every call | The daemon cannot come up: binary missing from PATH, bwrap missing, or the `initialize` handshake never answers | `npm run doctor`; run `codex app-server` by hand; `CODEX_TRANSPORT=exec` in `.env` isolates the daemon from the CLI itself |
+| Stop/timeout on a codex lane takes seconds longer than the others, then the next codex call starts slow | The daemon did not acknowledge `turn/interrupt` within its grace period, so the lane killed and later respawned it (a stuck turn) | Expected recovery; if every cancel does this, capture the daemon's stderr and check `npm run check-updates` |
 | Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
 | Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
 | Fused answer or analysis ends mid-sentence / JSON invalid | Claude output cap reached (model-dependent default; CLI normally auto-continues) | See the `childEnv()` comment in `src/providers/process.ts` for the one knob |
@@ -85,7 +90,8 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 - Every lane runs inside a bubblewrap jail (`jailArgv` in `src/providers/process.ts`): a fresh
   mount namespace with a tmpfs HOME that holds only that CLI's own state directory, the OS
   read-only, and the empty sandbox as cwd. The tool blocks (claude and kimi: no tools; grok:
-  the full deny list; codex: its read-only sandbox) are a second layer on top. `npm run canary`
+  the full deny list; codex: its read-only sandbox, web search off, and one long-lived daemon
+  that is jailed the same way as a per-call spawn) are a second layer on top. `npm run canary`
   plants a secret under the real HOME and proves no lane can quote it; run it after a CLI
   upgrade. The CLIs still hold their own OAuth tokens and have network access — the jail
   contains file access, not the subscription.

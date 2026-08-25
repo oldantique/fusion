@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- codex lane runs over a long-lived `codex app-server` daemon (JSON-RPC over stdio, generated
+  schema) instead of one `codex exec` per call: no cold start per call (the trivial-prompt lane
+  time roughly halves, `npm run smoke`), streamed token deltas, Stop interrupts the turn without
+  losing the daemon, per-turn token usage, typed quota errors. A fresh ephemeral read-only thread
+  per call; nothing is remembered server-side. `CODEX_TRANSPORT=exec` restores the old path.
 - Every lane runs inside a bubblewrap jail that exposes only that CLI's own state directory;
   `npm run canary` proves no lane can read a file planted under HOME. `FUSION_JAIL=off` to
   bisect a CLI that stopped working after an upgrade. grok also gets the full `--deny` set.

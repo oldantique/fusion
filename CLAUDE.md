@@ -67,9 +67,17 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
 - **claude on this account answers in Chinese by default** (account-level preference injected
   by the CLI; no flag disables it). Only the emphatic language line in `src/synth/prompts.ts`
   overrides it — verified for several languages. Do not soften it.
-- **codex** blocks on an open stdin; no token deltas; disabling its tools defeats the prompt
-  cache and costs more — keep the default tool set. It is the slowest lane and its concurrency
-  cap defaults to one (OpenAI asks that one `auth.json` not be shared across concurrent jobs).
+- **codex** runs over one long-lived `codex app-server` daemon (`src/providers/codex-app-server.ts`,
+  JSON-RPC over stdio; fresh ephemeral read-only thread per call; `turn/interrupt` for abort and
+  timeout; a daemon that dies fails the turn with a retryable kind so the retry respawns it).
+  Its stdio is unref'd between turns — scripts exit on their own; ref'd during a turn. The
+  `exec` path (`CODEX_TRANSPORT=exec`) is the bisecting fallback: it blocks on an open stdin, has
+  no token deltas, and pays a cold start per call. Disabling codex's tools defeats the prompt
+  cache and costs more — keep the default tool set. Concurrency cap defaults to one (OpenAI asks
+  that one `auth.json` not be shared across concurrent jobs; one daemon serializing turns is
+  exactly that). `app-server` and `mcp-server` ignore the codex API-key environment variable — subscription auth (`~/.codex/auth.json`) only.
+  The first `thread/start` after a daemon spawn is slow inside the jail (its model-list refresh
+  times out); every later one is instant.
 - **grok** ignores `--disallowed-tools`; only effect-scoped `--deny 'Tool(**)'` rules work, and
   not every tool name is a valid prefix (the CLI rejects unknown ones at startup; the valid set
   is the list in its provider definition). Its
