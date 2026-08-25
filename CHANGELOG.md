@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Prepared for public release: `SECURITY.md` (threat model, what the jail contains, how to report
+  a vulnerability), `CONTRIBUTING.md` (the three checks, the fixture rule, one-fact-one-home),
+  a CI workflow running `test` / `typecheck` / `check-docs` on a runner with none of the vendor
+  CLIs installed, a bug-report template that asks for `npm run doctor` and
+  `npm run check-updates` output, and repository metadata in `package.json`.
+- Docs no longer state as project truths things that were only true on the machine this was built
+  on: the account-language gotcha, the kimi IPv4 fallback (any host with AAAA records and no IPv6
+  egress, not one host), and `deploy/fusion.service`, which shipped the author's clone path as
+  `WorkingDirectory` — it is a placeholder to edit now.
 - Lanes start a fraction of a second apart instead of all at once, so a four-wide question no
   longer arrives at any vendor as a burst (`LANE_STAGGER_MS`, 0 to disable). The turn is not
   slower: the slowest lane still decides when it ends.
