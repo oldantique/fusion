@@ -194,7 +194,7 @@ async function api(path, opts = {}) {
 
 // ---------- state ----------
 const $ = (s) => document.querySelector(s);
-const state = { providers: [], conversations: [], current: null, busy: false, followingTurnId: null };
+const state = { providers: [], conversations: [], current: null, busy: false, followingTurnId: null, cutoffsLine: "" };
 const PICK_KEY = "fusion.providers";
 
 // ---------- login ----------
@@ -287,6 +287,10 @@ function showEmpty(msg) {
   const d = document.createElement("div");
   d.className = "empty";
   d.textContent = msg;
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = `All models answer offline — no web search or browsing — so nothing from the live web is mixed into the answers. Each one knows the world only up to its training cutoff: ${state.cutoffsLine ?? ""}`;
+  d.append(hint);
   $("#turns").append(d);
 }
 function setBusy(b) {
@@ -311,7 +315,7 @@ function renderPicks() {
     label.title = p.model + (p.streams ? " · streams" : "") + (p.cutoff ? ` · knowledge up to ${p.cutoff}` : " · knowledge cutoff not published");
     box.append(label);
   }
-  $("#cutoffs").textContent = state.providers.map((p) => `${p.label} ${p.cutoff ?? "(not published)"}`).join(" · ") + ".";
+  state.cutoffsLine = state.providers.map((p) => `${p.label} ${p.cutoff ?? "(not published)"}`).join(" · ") + ".";
 }
 function pickedProviders() {
   return [...document.querySelectorAll("#provider-picks input:checked")].map((i) => i.value);
