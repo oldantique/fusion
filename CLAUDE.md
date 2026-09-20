@@ -24,8 +24,8 @@ a drift source: describe magnitude ("the slowest lane", "an order of magnitude f
 and point at the script that measures it (`npm run smoke`) rather than quoting a figure.
 `npm run check-docs` mechanically verifies that every command, path and env var the docs name
 actually exists; it runs as part of `npm test`. The judgement half — are the sentences still
-true — is the `sync-docs` skill (`.claude/skills/sync-docs/SKILL.md`); run it after a chunk of
-work and before compacting.
+true — is the `sync-docs` skill (`.claude/skills/sync-docs/SKILL.md`), invoked only by the
+`/sync-docs` command: after a chunk of work and before compacting.
 
 ## Conventions
 

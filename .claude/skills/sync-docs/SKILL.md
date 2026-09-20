@@ -1,18 +1,18 @@
 ---
 name: sync-docs
 description: >-
-  Sync Fusion's living docs + memory after a chunk of work — after a provider/flag/prompt
-  change, after a CLI upgrade, after a release, before /compact while the evidence is still in
-  context, or whenever drift is suspected. Use when the user asks to sync/audit/tidy docs or
-  memory, or says 要 compact 了 / 持久化本 session / 收尾沉淀.
+  Sync Fusion's living docs + memory: persist what this session decided (context first — memory
+  edits, harness notices and spoken decisions never show in git), then fix drift. Run after a
+  chunk of work and before /compact.
+disable-model-invocation: true
 ---
 
 # Sync living docs + memory (Fusion)
 
-Fix drift only. One fact, one home; everything else points. Prefer deleting a stale line or
-replacing it with a pointer over restating. The ownership table ("Where facts live") in the
-root `CLAUDE.md` is the authority for *which file owns what* — read it as it stands, don't
-hardcode a copy here. Everything on disk is English; chat is Chinese.
+Persist what this session decided, then fix drift. One fact, one home; everything else points.
+Prefer deleting a stale line or replacing it with a pointer over restating. The ownership table
+("Where facts live") in the root `CLAUDE.md` is the authority for *which file owns what* — read
+it as it stands, don't hardcode a copy here. Everything on disk is English; chat is Chinese.
 
 `npm run check-docs` is the mechanical half of this pass (dangling script/path/env references,
 version numbers outside their home). It proves a reference *exists*, never that the sentence
@@ -36,17 +36,18 @@ file instead) · `data/` (runtime, gitignored) · `.env` (secrets).
 **Memory** (Claude Code's per-project memory directory, outside git): preferences,
 workflow lessons and pointers only — nothing derivable from the repo. Update an existing file
 before creating one; delete wrong ones; relative → absolute dates; `MEMORY.md` indexes every
-file exactly once. No test reaches memory; check its paths by hand.
+file exactly once. No test reaches memory and its edits never appear in `git log`; check its
+paths by hand.
 
 ## Invariants (each has a slug for the pass log)
 
-- `check-docs-green` — `npm run check-docs` passes. If it names a problem, fix the doc (or move
-  the fact to its home), never weaken the check to make it pass.
 - `code-owns-behaviour` — if `src/providers/`, `src/parsers/`, `src/synth/`, `src/server/jobs.ts`
   or `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
   RUNBOOK failure-mode row and the newest DESIGN entry that describes that behaviour; a sentence
   that now contradicts the code is deleted or corrected, not annotated. Gotchas stay one-line
-  claim + pointer.
+  claim + pointer. An event type or status added to or retired from the `FuseEvent`/`JobEvent`
+  union (`src/synth/fuse.ts`, `src/server/jobs.ts`) has its handler added to or removed from
+  `web/app.js`.
 - `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run check-updates` lists
   installed-but-unverified CLIs and `--help-diff` shows new flags), `npm run smoke` must pass; a
   changed output format means a new fixture, a new row in `fixtures/README.md`, and parser + test
@@ -57,11 +58,9 @@ file exactly once. No test reaches memory; check its paths by hand.
   (THREADS #17).
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads
   (mechanical) **and** each comment still describes the effect (by eye).
-- `events-match-ui` — the `FuseEvent`/`JobEvent` union in `src/synth/fuse.ts` and
-  `src/server/jobs.ts` and the handlers in `web/app.js` cover the same event types and
-  statuses; a new event with no handler, or a handler for a retired event, is drift.
 - `threads-current` — every THREADS row's state matches reality; finished rows move to Archive
-  with a one-line outcome (never deleted); `BLOCKED-by` targets exist.
+  with a one-line outcome (never deleted); `BLOCKED-by` targets exist; an item awaiting the
+  owner's decision has state `DECIDE`.
 - `design-appended` — if the code now does something DESIGN.md says it doesn't (or vice versa),
   add a dated entry; do not edit old entries.
 - `release-triple` — at a release, `package.json` `version`, the git tag and the newest
@@ -74,12 +73,23 @@ file exactly once. No test reaches memory; check its paths by hand.
   streaming, the synthesizer changing), grep the old claim across the living set + memory and
   fix every dependent sentence in one pass.
 
-## Method
+## Method (every pass — the command is the only trigger)
 
-`git log --oneline` since the last `Sync-rule-hits` commit + `git status` → run
-`npm run check-docs` → walk the invariants, judging each doc against the ownership table → fix
-only actual drift → one logical commit (don't fragment) under standing authorization → report
-one line per file changed, or "no drift".
+1. **Context sweep first — what git cannot show.** From the conversation, list this session's
+   decisions, new rules, premise changes, renames, CLI upgrades noticed, memory edits and
+   anything the harness announced (attribution lines, model names). For each: is it written in
+   its home per the ownership table — a decision with its why in DESIGN, deferred work in
+   THREADS, a user-visible change in CHANGELOG `Unreleased`, a corrected mistake as a gotcha?
+   grep the living set + memory for every sentence that depends on it and fix them together.
+2. **Repo sweep**: `git log --oneline` since the last `Sync-rule-hits` commit + `git status` →
+   walk the invariants, judging each doc against the ownership table → fix only actual drift.
+3. **Verify + commit**: `npm test` (runs `check-docs`) + `npm run typecheck`. If `check-docs`
+   names a problem, fix the doc or move the fact to its home — never weaken the check. One
+   logical commit (don't fragment) under standing authorization; memory edits need no commit.
+   Working-tree state is reported in chat only, never written to THREADS.
+4. **Report**: one line per file changed, or "no drift". List anything that could not be
+   persisted (a decision that exists only in the conversation) and ask about it; otherwise end
+   with an explicit **"可以 compact"** — the goal is zero loss even if the summary is lossy.
 
 End the commit message with the rules that actually fired, slugs only, comma-separated; omit
 the trailer when nothing changed:
@@ -88,16 +98,4 @@ the trailer when nothing changed:
 
 Read the accumulated log with `git log --grep='Sync-rule-hits' --format='%h %s%n  %b'`.
 A slug that never fires over many passes is a deletion candidate; judge from usage, not from
-a static read.
-
-## Pre-/compact persistence mode ("persist first, compress after")
-
-Triggered by "要 compact 了 / persist this session". Goal: zero loss even if the summary is lossy.
-
-1. Write every un-persisted decision, rule or state change from this session into its home per
-   the ownership table; commit completed logical groups.
-2. Update `docs/THREADS.md`: close finished rows (→ Archive), add new ones with next step and
-   files involved; items awaiting the owner's decision get state `DECIDE`. Working-tree state is
-   reported in chat only, never written to THREADS.
-3. Report where each piece landed, list anything that could not be persisted (e.g. a decision
-   that exists only in conversation) and ask about it, then end with an explicit **"可以 compact"**.
+a static read. Old trailers may carry retired slugs.

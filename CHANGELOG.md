@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- UI: the offline / training-cutoff notice moved from the composer to the empty state of a
+  conversation, so it is read before the first question and no longer occupies every composer.
+
 ## 0.2.0 — 2026-08-25
 
 - Prepared for public release: `SECURITY.md` (threat model, what the jail contains, how to report
