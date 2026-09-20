@@ -19,6 +19,7 @@
  * on their own; ref'd during a turn so the event loop stays alive for it.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
 import readline from "node:readline";
 import { config } from "../config.ts";
 import type { CallOptions, LaneErrorKind, LaneEvent, Provider, Usage } from "../types.ts";
@@ -64,6 +65,7 @@ export function spawnAppServer(): DaemonChild {
   let args = ["app-server", "--listen", "stdio://"];
   let env = childEnv();
   const cwd = config.sandboxDir;
+  fs.mkdirSync(cwd, { recursive: true }); // absent on a fresh clone; see runLines
   if (config.jail) {
     if (!config.bwrapPath) throw new Error("bwrap not found: the lane jail needs bubblewrap (apt install bubblewrap); FUSION_JAIL=off disables it");
     ({ cmd, args, env } = jailArgv(cmd, args, CODEX_MOUNTS, env, cwd));

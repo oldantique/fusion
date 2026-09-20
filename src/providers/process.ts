@@ -187,6 +187,9 @@ function signalTree(pid: number, sig: NodeJS.Signals) {
 export async function* runLines(opts: RunOptions): AsyncGenerator<ProcessLine | ProcessExit> {
   const timeoutMs = opts.timeoutMs ?? config.laneTimeoutMs;
   const cwd = opts.cwd ?? config.sandboxDir;
+  // A fresh clone has no data/ yet, and a missing cwd fails the spawn with an ENOENT that names
+  // the command instead of the directory.
+  fs.mkdirSync(cwd, { recursive: true });
   let { cmd, args } = opts;
   let env = opts.env ?? childEnv();
   if (opts.jail && config.jail) {

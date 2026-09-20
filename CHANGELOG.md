@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A fresh clone no longer fails its first lane call with a misleading "spawn … ENOENT": the
+  empty sandbox directory the CLIs run in is created on demand, not only by the server.
 - `npm run check-updates -- --tools-diff`: baselines of what each lane advertises to its model —
   tools and MCP servers for claude and grok, error variants for codex — so a CLI upgrade that
   adds one shows up as a diff instead of being found by reading a capture.
