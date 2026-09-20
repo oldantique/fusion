@@ -32,8 +32,11 @@ Port and bind address come from `.env`. An unauthenticated request to `/api/heal
 2. `npm test && npm run typecheck`.
 3. `systemctl --user restart fusion`.
 
-The schema is created with `IF NOT EXISTS` on start; destructive migrations must be written by
-hand and noted in `CHANGELOG.md`.
+The schema is created with `IF NOT EXISTS` on start, and data migrations run then too, once
+each, atomically (`migrate()` in `src/store/db.ts`; the file's `PRAGMA user_version` says which
+have run). Take the backup below before an upgrade whose `CHANGELOG.md` entry mentions one —
+an older build can still open a migrated file, but what it writes lacks the newer fields.
+Destructive migrations are written by hand and noted in `CHANGELOG.md`.
 
 ### After upgrading one of the CLIs
 
@@ -63,6 +66,7 @@ and grok capture: its tool list and MCP-server list must contain nothing the lan
 | Lane badge says "rate limited" | Subscription quota for that vendor exhausted (shared with your interactive use of the same CLI); not retried | Check the vendor's usage page; wait for the window to reset; untick the lane meanwhile |
 | Lane fails with a terse or odd error, usually the same lane every time | Usually the same quota exhaustion, from a CLI whose message does not say so | As above |
 | Lane fails with "timed out" | Model slow or rate-limited | Check vendor status; raise the timeout in `.env`; untick the lane |
+| A lane fails with "provider reported is_error" and nothing else | The vendor ended the run with an error flag and no message (seen from grok); already retried once | Usually transient: ask again, or `npm run smoke` for that lane; if it persists, run the CLI by hand from `data/sandbox/` to see its stderr |
 | A lane fails after a CLI upgrade with a missing-file / ENOENT / permission error | The new build wants a path the jail does not expose | Bisect with `FUSION_JAIL=off` in `.env` (restart); if the lane works unjailed, add the path to that provider's `mounts` in `src/providers/index.ts`, turn the jail back on, re-run `npm run smoke` and `npm run canary` |
 | Every lane fails at once with "bwrap not found" | bubblewrap missing, or the service's PATH does not include it | `apt install bubblewrap`; `npm run doctor` checks it can create a sandbox on this kernel |
 | codex lanes sit in "queued" | Codex concurrency cap reached by overlapping turns | Expected; raise the cap in `.env` after a plan upgrade |

@@ -1,4 +1,7 @@
-/** SQLite persistence (node:sqlite). One writer process; WAL so readers never block. */
+/**
+ * SQLite persistence (node:sqlite). One writer process; WAL so readers never block. Schema is
+ * created on open; data migrations are versioned and run once (`migrate()`).
+ */
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
