@@ -390,3 +390,24 @@ id is shown as itself with an unknown cutoff — a model set in `.env` used to i
 default's name. The snapshot records the id we asked the CLI for; an alias is resolved by the
 vendor and not reported back. Prompts, history replay and SSE event shapes are unchanged.
 
+
+## 2026-09-20 — What a lane advertises is a committed baseline; a reported failure waits for the exit
+
+Two follow-ups to the re-verification above, both prompted by comparing notes with a sibling
+repo that maintains call sheets for the same CLIs.
+
+The procedural lesson ("read the init line of a fresh capture") became a command the same day:
+`npm run check-updates -- --tools-diff` keeps `fixtures/help/*.tools.txt`. The lists are taken
+through the lane itself, so they describe what Fusion's flags and jail leave the model with, not
+what the bare CLI offers; the call is aborted when the init record arrives, so a check costs no
+answer. codex prints no tool list, and its equivalent surprise is a new error variant, so its
+baseline is the error set of the schema the installed build generates. It stays out of
+`hooks/pre-commit` on purpose: it logs in and spawns CLIs, and the hook's value is that it is
+offline and instant.
+
+A failure that a CLI reports inside its own stream used to be passed on the moment it was
+parsed, which was the one path that never saw stderr. grok can end a run with an error flag and
+no message while the reason (a refused wording, a quota) is only on stderr, so the report is now
+held until the process exits, the stderr tail is attached and takes part in rate-limit
+classification, and the lane's own timeout or abort verdict outranks whatever the CLI printed
+while being killed — a timed-out lane is no longer retried as an ordinary exit.

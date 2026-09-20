@@ -210,7 +210,9 @@ export async function* runLines(opts: RunOptions): AsyncGenerator<ProcessLine | 
     cwd,
     env,
     stdio: [opts.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
-    detached: true, // own process group, so helpers the CLI spawns die with it
+    // Own process group, so helpers the CLI spawns die with it. A helper that starts a group of
+    // its own escapes that signal; inside the jail the pid namespace ends it with bwrap.
+    detached: true,
   });
 
   let stderr = "";
