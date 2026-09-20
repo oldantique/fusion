@@ -50,7 +50,10 @@ export function cliProvider(spec: CliProviderSpec): Provider {
       };
       let exit: ProcessExit | undefined;
       let sawDone = false;
-      let sawError = false;
+      // A failure the CLI reported in its own stream. Held until the process has exited: the
+      // record can carry no message at all (seen from grok) while the reason is on stderr, and
+      // our own timeout or abort is a truer account than whatever the CLI printed while dying.
+      let reported: Extract<LaneEvent, { type: "error" }> | undefined;
       // claude prints some failures (empty prompt, auth, quota) as plain text on *stdout* with an
       // empty stderr, so non-JSON stdout lines are kept for the error message.
       const plain: string[] = [];
@@ -65,18 +68,11 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         const events = obj !== undefined ? parser.feed(obj) : (spec.plainLine?.(item.line, parser) ?? []);
         for (const ev of events) {
           if (ev.type === "done") sawDone = true;
-          if (ev.type === "error") {
-            sawError = true;
-            // Parsers cannot tell a quota block from any other reported failure, so they all say
-            // "exit"; re-classify on the way out, where the rate-limit record is also visible.
-            yield { ...ev, kind: ev.kind === "exit" ? classify(ev.message, "exit") : ev.kind };
-            continue;
-          }
-          yield ev;
+          if (ev.type === "error") reported ??= ev;
+          else yield ev;
         }
       }
 
-      if (sawError) return;
       if (!exit) {
         yield { type: "error", message: "process ended without exit record", kind: "internal" };
         return;
@@ -87,6 +83,14 @@ export function cliProvider(spec: CliProviderSpec): Provider {
       }
       if (exit.aborted) {
         yield { type: "error", message: "aborted", kind: "aborted" };
+        return;
+      }
+      if (reported) {
+        const err = tail(exit.stderr);
+        const message = err ? `${reported.message} | ${err}` : reported.message;
+        // Parsers cannot tell a quota block from any other reported failure, so they all say
+        // "exit"; re-classify here, where the rate-limit record and stderr are also visible.
+        yield { ...reported, message, kind: reported.kind === "exit" ? classify(message, "exit") : reported.kind };
         return;
       }
       if (exit.code !== 0) {

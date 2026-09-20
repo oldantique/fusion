@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A failure a CLI reports inside its own stream now carries that CLI's stderr: grok can end a
+  run with an error flag and no message, and the reason (a refusal, a quota) was being dropped.
+  The stderr text also takes part in rate-limit detection, and a lane that timed out or was
+  stopped says so whatever the CLI printed on the way down.
 - History keeps naming the model that answered: each turn stores the model every provider was
   configured with, and the UI names lanes, the synthesizer and the analysis from that snapshot.
   Existing turns are backfilled once (they all ran on the defaults of the time). Names and
