@@ -52,11 +52,11 @@ paths by hand.
   `web/app.js`.
 - `cli-upgrade-recapture` — `npm run check-updates -- --strict --offline` must be clean
   (`hooks/pre-commit` refuses lane-code commits otherwise; the CLIs update themselves, so expect
-  it). Re-verifying a CLI = `--help-diff`, `--tools-diff`, `npm run smoke`, `npm run canary`, a fresh capture
-  compared with its fixture, and **every CLAUDE.md gotcha about that CLI re-tested, not assumed**
-  (one teammate per CLI works well). Then a `fixtures/README.md` row naming the version
-  `check-updates` prints *after* the runs, and `--update` for both diffs. A changed output format means a new fixture plus
-  parser and test updates in the same commit.
+  it). Re-verifying a CLI = `--help-diff`, `--tools-diff`, `npm run smoke`, `npm run canary`, a
+  fresh capture compared with its fixture, and **every CLAUDE.md gotcha about that CLI re-tested,
+  not assumed** (one teammate per CLI works well). Then a `fixtures/README.md` row naming the
+  version `check-updates` prints *after* the runs, and `--update` for both diffs. A changed
+  output format means a new fixture plus parser and test updates in the same commit.
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads
   (mechanical) **and** each comment still describes the effect (by eye).
 - `threads-current` — every THREADS row's state matches reality; finished rows move to Archive
