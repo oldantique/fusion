@@ -4,7 +4,7 @@
 npm test --silent >/dev/null 2>&1 || { echo "pre-push: npm test fails — run it to see why." >&2; exit 1; }
 npm run -s typecheck >/dev/null 2>&1 || { echo "pre-push: npm run typecheck fails." >&2; exit 1; }
 # Owner-only facts outside the captured fixtures (which keep their paths on purpose).
-if hits=$(git grep -nIF -e "$HOME/" -e "@gmail.com" -- . ':!fixtures'); then
+if hits=$(git grep -nIF -e "$HOME/" -e "@gmail.com" -- . ':!fixtures' ':!hooks'); then
   echo "pre-push: a personal path or address is tracked — generalise it:" >&2; echo "$hits" | head >&2; exit 1
 fi
 exit 0
