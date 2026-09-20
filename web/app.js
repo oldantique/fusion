@@ -271,7 +271,7 @@ async function openConversation(id) {
   box.innerHTML = "";
   if (conv.turns.length === 0) showEmpty("Ask a question below — it goes to every selected model at once.");
   for (const t of conv.turns) {
-    const view = mountTurn(t.question, t.providers);
+    const view = mountTurn(t.question, t.providers, t.models);
     if (t.status === "running") {
       setBusy(true);
       followTurn(t.id, view).finally(() => { setBusy(false); loadConversations(); });
@@ -312,17 +312,16 @@ function renderPicks() {
     cb.checked = saved ? saved.includes(p.id) : true;
     cb.addEventListener("change", () => { localStorage.setItem(PICK_KEY, JSON.stringify(pickedProviders())); $("#composer-note").textContent = ""; });
     label.append(cb, document.createTextNode(` ${p.label}`));
-    label.title = p.model + (p.streams ? " · streams" : "") + (p.cutoff ? ` · knowledge up to ${p.cutoff}` : " · knowledge cutoff not published");
+    label.title = p.model + (p.streams ? " · streams" : "") + (p.cutoff ? ` · knowledge up to ${p.cutoff}` : p.cutoffKnown ? " · knowledge cutoff not published" : " · knowledge cutoff unknown");
     box.append(label);
   }
-  state.cutoffsLine = state.providers.map((p) => `${p.label} ${p.cutoff ?? "(not published)"}`).join(" · ") + ".";
+  state.cutoffsLine = state.providers.map((p) => `${p.label} ${p.cutoff ?? (p.cutoffKnown ? "(not published)" : "(unknown)")}`).join(" · ") + ".";
 }
 function pickedProviders() {
   return [...document.querySelectorAll("#provider-picks input:checked")].map((i) => i.value);
 }
 
 // ---------- turns ----------
-function labelOf(id) { return state.providers.find((p) => p.id === id)?.label ?? id; }
 
 // One delegated handler for every copy button in the transcript: the ones inside answers are
 // recreated on every streamed delta, so they must not own their own listeners.
@@ -343,14 +342,18 @@ $("#turns").addEventListener("click", (e) => {
   }
 });
 
-function mountTurn(question, providerIds) {
+// Names inside a turn come from the snapshot stored with that turn, never from the live provider
+// list: a lane's model changes over time and history must keep naming what actually answered.
+// A turn without a snapshot says so rather than borrowing today's name.
+function mountTurn(question, providerIds, models) {
+  const name = (id) => models?.[id]?.label ?? `${id} (model unknown)`;
   const node = $("#turn-tpl").content.firstElementChild.cloneNode(true);
   node.querySelector(".q").textContent = question;
   const lanes = {};
   const lanesBox = node.querySelector(".lanes");
   for (const id of providerIds) {
     const ln = $("#lane-tpl").content.firstElementChild.cloneNode(true);
-    ln.querySelector(".lane-name").textContent = labelOf(id);
+    ln.querySelector(".lane-name").textContent = name(id);
     lanesBox.append(ln);
     lanes[id] = { el: ln, status: ln.querySelector(".lane-status"), meta: ln.querySelector(".lane-meta"), body: streamer(ln.querySelector(".lane-body")), startedAt: null, timer: null };
   }
@@ -366,6 +369,7 @@ function mountTurn(question, providerIds) {
     analysisBody: node.querySelector(".analysis-body"),
     lanes,
     letterMap: null,
+    name,
   };
   return view;
 }
@@ -403,7 +407,7 @@ function paintLaneResult(lane, r) {
 
 function paintAnalysis(view, analysis, letterMap) {
   if (!analysis) return;
-  const name = (letter) => letterMap?.[letter] ? `${labelOf(letterMap[letter])}` : letter;
+  const name = (letter) => letterMap?.[letter] ? view.name(letterMap[letter]) : letter;
   const section = (title, items, fmt = (s) => s) => {
     if (!items?.length) return "";
     return `<h4>${title}</h4><ul>${items.map((i) => `<li>${fmt(i)}</li>`).join("")}</ul>`;
@@ -412,7 +416,7 @@ function paintAnalysis(view, analysis, letterMap) {
   // The synthesizer is told to write "candidate X"; only that phrase (and a letter list after it,
   // "candidates B, C and D") is de-anonymized, so a bare "B" in ordinary prose (vitamin B, plan B)
   // is left alone. "候选" is accepted too: models sometimes translate the token despite the prompt.
-  const one = (l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(labelOf(letterMap[l]))}</span>` : l);
+  const one = (l) => (letterMap?.[l] ? `<span class="letter" title="Candidate ${l}">${esc(view.name(letterMap[l]))}</span>` : l);
   const deanon = (s) =>
     esc(s).replace(/(\b[Cc]andidates?|候选)\s*([A-H](?:\s*(?:[、,，/&]|and|和)\s*[A-H])*)(?![A-Za-z])/g, (m, word, letters) =>
       `${word} ${letters.replace(/[A-H]/g, one)}`);
@@ -425,7 +429,7 @@ function paintAnalysis(view, analysis, letterMap) {
   if (letterMap) {
     for (const [letter, pid] of Object.entries(letterMap)) {
       const lane = view.lanes[pid];
-      if (lane) lane.el.querySelector(".lane-name").textContent = `${labelOf(pid)} · ${letter}`;
+      if (lane) lane.el.querySelector(".lane-name").textContent = `${view.name(pid)} · ${letter}`;
     }
   }
 }
@@ -435,8 +439,8 @@ function paintFinishedTurn(view, t) {
   for (const id of Object.keys(view.lanes)) if (!t.lanes.some((l) => l.provider === id)) { badge(view.lanes[id].status, "skipped", ""); }
   if (t.status === "done") {
     view.answer.set(t.answer || "");
-    if (t.synth_provider) { badge(view.synthBadge, `Fused by ${labelOf(t.synth_provider)}`, "ok"); view.synthMeta.textContent = t.synth_ms ? secs(t.synth_ms) : ""; }
-    else if (t.answer_provider && t.lanes.filter((l) => l.status === "done").length > 1) badge(view.synthBadge, `Unfused: ${labelOf(t.answer_provider)}`, "warn");
+    if (t.synth_provider) { badge(view.synthBadge, `Fused by ${view.name(t.synth_provider)}`, "ok"); view.synthMeta.textContent = t.synth_ms ? secs(t.synth_ms) : ""; }
+    else if (t.answer_provider && t.lanes.filter((l) => l.status === "done").length > 1) badge(view.synthBadge, `Unfused: ${view.name(t.answer_provider)}`, "warn");
     else badge(view.synthBadge, "Single answer", "ok");
     paintAnalysis(view, t.analysis, t.letter_map);
   } else if (t.status === "cancelled") {
@@ -484,13 +488,13 @@ function followTurn(turnId, view) {
     });
     es.addEventListener("synth", (e) => {
       const ev = JSON.parse(e.data);
-      if (ev.status === "start") { view.answer.set(""); badge(view.synthBadge, `${ev.retry ? "Retry: " : ev.fallback ? "Fallback: " : ""}Fusing with ${labelOf(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
+      if (ev.status === "start") { view.answer.set(""); badge(view.synthBadge, `${ev.retry ? "Retry: " : ev.fallback ? "Fallback: " : ""}Fusing with ${view.name(ev.provider)}…`, "run"); view.answerEl.classList.add("cursor"); }
       else if (ev.status === "delta") { view.answer.append(ev.text); }
-      else if (ev.status === "done") { view.answer.set(ev.result.answer); badge(view.synthBadge, `Fused by ${labelOf(ev.result.provider)}`, "ok"); view.synthMeta.textContent = secs(ev.result.ms); paintAnalysis(view, ev.result.analysis, ev.result.letterMap); view.answerEl.classList.remove("cursor"); }
+      else if (ev.status === "done") { view.answer.set(ev.result.answer); badge(view.synthBadge, `Fused by ${view.name(ev.result.provider)}`, "ok"); view.synthMeta.textContent = secs(ev.result.ms); paintAnalysis(view, ev.result.analysis, ev.result.letterMap); view.answerEl.classList.remove("cursor"); }
       else if (ev.status === "skipped") {
         view.answerEl.classList.remove("cursor");
         if (ev.reason === "all lanes failed") { badge(view.synthBadge, "Failed", "bad"); terminal = true; }
-        else if (ev.reason === "synthesis failed") { view.answer.set(""); badge(view.synthBadge, `Unfused: ${labelOf(ev.provider)}`, "warn"); view.synthMeta.textContent = "every synthesizer failed; showing one model's answer"; }
+        else if (ev.reason === "synthesis failed") { view.answer.set(""); badge(view.synthBadge, `Unfused: ${view.name(ev.provider)}`, "warn"); view.synthMeta.textContent = "every synthesizer failed; showing one model's answer"; }
         else badge(view.synthBadge, "Single answer", "ok");
       }
       keep();
@@ -527,9 +531,9 @@ async function ask() {
   }
   setBusy(true);
   $("#composer-note").textContent = "";
-  let turnId;
+  let turnId, models;
   try {
-    ({ turnId } = await api(`/api/conversations/${state.current.id}/ask`, { method: "POST", body: JSON.stringify({ question: q, providers }) }));
+    ({ turnId, models } = await api(`/api/conversations/${state.current.id}/ask`, { method: "POST", body: JSON.stringify({ question: q, providers }) }));
   } catch (err) {
     // Refused (e.g. a turn is still running here): keep the text so nothing is lost.
     $("#composer-note").textContent = err.message;
@@ -537,7 +541,7 @@ async function ask() {
     return;
   }
   $("#question").value = "";
-  const view = mountTurn(q, providers);
+  const view = mountTurn(q, providers, models);
   $("#turns").scrollTop = $("#turns").scrollHeight;
   try {
     await loadConversations();

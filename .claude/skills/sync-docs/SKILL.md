@@ -79,7 +79,8 @@ paths by hand.
 - `propagate-premises` — when a load-bearing premise moves (a vendor's terms, a CLI gaining
   streaming, the synthesizer changing), grep the old claim across the living set + memory and
   fix every dependent sentence in one pass. A lane's model changing is the common case: the id
-  (`src/config.ts`, `.env.example`), and the label and vendor-stated cutoff in `src/types.ts`.
+  (`src/config.ts`, `.env.example`) and a `KNOWN_MODELS` row in `src/types.ts` with the label
+  and the vendor-stated cutoff.
 
 ## Method (every pass — the command is the only trigger)
 

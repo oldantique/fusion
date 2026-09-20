@@ -7,7 +7,8 @@
 import type { FuseEvent, FuseInput, FuseOutput } from "../synth/fuse.ts";
 import { fuse as realFuse } from "../synth/fuse.ts";
 import type { Store } from "../store/db.ts";
-import type { ProviderId } from "../types.ts";
+import { ALL_PROVIDERS, modelInfo, type ModelSnapshot, type ProviderId } from "../types.ts";
+import { config } from "../config.ts";
 
 export type JobEvent =
   | FuseEvent
@@ -16,6 +17,14 @@ export type JobEvent =
   | { type: "fatal"; message: string };
 
 export type SeqEvent = { seq: number; ev: JobEvent };
+
+/**
+ * All four, not just the selected lanes: the synthesizer chain is fixed, so a provider the user
+ * unticked can still be the one that fuses the answer and must be nameable from the snapshot.
+ */
+export function configuredModels(): ModelSnapshot {
+  return Object.fromEntries(ALL_PROVIDERS.map((id) => { const { model, label } = modelInfo(id, config.models[id]); return [id, { model, label }]; }));
+}
 
 /** Thrown by start() when the conversation already has a running turn. */
 export class ConflictError extends Error {
@@ -47,9 +56,12 @@ export class Jobs {
   private readonly store: Store;
   private readonly fuse: (input: FuseInput) => Promise<FuseOutput>;
 
-  constructor(store: Store, fuseImpl: (input: FuseInput) => Promise<FuseOutput> = realFuse) {
+  private models: () => ModelSnapshot;
+
+  constructor(store: Store, fuseImpl: (input: FuseInput) => Promise<FuseOutput> = realFuse, models: () => ModelSnapshot = configuredModels) {
     this.store = store;
     this.fuse = fuseImpl;
+    this.models = models;
   }
 
   /** Turn currently running in a conversation, if any. */
@@ -62,7 +74,7 @@ export class Jobs {
     if (active) throw new ConflictError(active);
 
     const history = this.store.history(conversationId);
-    const turn = this.store.startTurn(conversationId, question, providerIds);
+    const turn = this.store.startTurn(conversationId, question, providerIds, this.models());
     let resolveDone!: () => void;
     const job: Job = {
       turnId: turn.id,

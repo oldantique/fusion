@@ -7,7 +7,7 @@ import { config } from "../config.ts";
 import { createAnthropicStreamParser } from "../parsers/anthropic-stream.ts";
 import { createCodexParser, createKimiParser } from "../parsers/whole-message.ts";
 import type { CallOptions, Provider, ProviderId } from "../types.ts";
-import { PROVIDER_LABELS } from "../types.ts";
+import { modelInfo } from "../types.ts";
 import { cliProvider } from "./base.ts";
 import { CODEX_MOUNTS, codexAppServer } from "./codex-app-server.ts";
 
@@ -21,7 +21,7 @@ function inlineSystem(opts: CallOptions): string {
 
 export const claude: Provider = cliProvider({
   id: "claude",
-  label: PROVIDER_LABELS.claude,
+  label: modelInfo("claude", config.models.claude).label,
   streams: true,
   supportsJsonSchema: true,
   // Writable: the OAuth refresh rewrites .credentials.json and the CLI updates .claude.json.
@@ -64,7 +64,7 @@ export const claude: Provider = cliProvider({
  */
 export const codexExec: Provider = cliProvider({
   id: "codex",
-  label: PROVIDER_LABELS.codex,
+  label: modelInfo("codex", config.models.codex).label,
   streams: false,
   supportsJsonSchema: false,
   mounts: CODEX_MOUNTS,
@@ -95,7 +95,7 @@ export const codex: Provider = config.codexTransport === "exec" ? codexExec : co
 
 export const kimi: Provider = cliProvider({
   id: "kimi",
-  label: PROVIDER_LABELS.kimi,
+  label: modelInfo("kimi", config.models.kimi).label,
   streams: false,
   supportsJsonSchema: false,
   // ~/.kimi-code holds the binary, its bundled rg/fd, credentials and sessions, so it is rw as a
@@ -119,7 +119,7 @@ export const kimi: Provider = cliProvider({
 
 export const grok: Provider = cliProvider({
   id: "grok",
-  label: PROVIDER_LABELS.grok,
+  label: modelInfo("grok", config.models.grok).label,
   streams: true,
   supportsJsonSchema: true,
   mounts: { rw: ["~/.grok"] },

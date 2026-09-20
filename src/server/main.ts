@@ -8,7 +8,7 @@ import { streamSSE } from "hono/streaming";
 import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
 import { Store } from "../store/db.ts";
 import { Jobs, ConflictError } from "./jobs.ts";
-import { ALL_PROVIDERS, PROVIDER_LABELS, PROVIDER_CUTOFFS, type ProviderId } from "../types.ts";
+import { ALL_PROVIDERS, modelInfo, type ProviderId } from "../types.ts";
 import { providers } from "../providers/index.ts";
 import { codexDaemon } from "../providers/codex-app-server.ts";
 import { clearSession, issueSession, passwordMatches, requireAuth, isAuthenticated } from "./auth.ts";
@@ -50,13 +50,11 @@ app.use("/api/*", requireAuth);
 // ---- meta ----
 app.get("/api/providers", (c) =>
   c.json(
-    ALL_PROVIDERS.map((id) => ({
-      id,
-      label: PROVIDER_LABELS[id],
-      model: config.models[id],
-      streams: providers[id].streams,
-      cutoff: PROVIDER_CUTOFFS[id],
-    })),
+    ALL_PROVIDERS.map((id) => {
+      const info = modelInfo(id, config.models[id]);
+      // `cutoffKnown: false` = a model we have no row for; the UI must not call that "not published".
+      return { id, label: info.label, model: info.model, streams: providers[id].streams, cutoff: info.cutoff, cutoffKnown: info.known };
+    }),
   ),
 );
 app.get("/api/health", (c) => c.json({ ok: true, effort: config.effort, synthEffort: config.synthEffort, laneTimeoutSec: config.laneTimeoutMs / 1000 }));
@@ -102,7 +100,8 @@ app.post("/api/conversations/:id/ask", async (c) => {
   if (conv.turn_count === 0 && conv.title === "New conversation") store.renameConversation(conv.id, question.slice(0, 80));
   try {
     const turnId = jobs.start(conv.id, question, ids);
-    return c.json({ turnId }, 202);
+    // The snapshot rides along so the UI names this turn from what the turn stored, like any other.
+    return c.json({ turnId, models: store.getTurn(turnId)?.models ?? null }, 202);
   } catch (e) {
     if (e instanceof ConflictError) return c.json({ error: "turn in progress", turnId: e.turnId }, 409);
     throw e;

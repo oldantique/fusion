@@ -373,3 +373,20 @@ server lists in a fresh capture's init line, because a new tool is not a new fla
 Also recorded: codex's typed error set gained a rate-limit variant; an untyped quota error falls
 to the retry path and burns quota, so new variants of that enum are checked on every upgrade.
 
+## 2026-09-20 — A turn records the models it ran on
+
+Switching the codex lane's model renamed every past codex answer, because the database stored
+provider ids and the UI resolved names from the live provider list. Each turn now stores a
+snapshot `{provider: {model, label}}` for all four providers at creation (`turns.models_json`),
+and the UI names everything inside a turn from it — never from the live list, and a turn with no
+snapshot says "model unknown" rather than borrowing today's name. Reviewed with codex before
+implementation; its objections shaped three choices. (1) One snapshot per turn rather than columns
+on lane rows: the synthesizer chain is fixed, so a provider the user unticked can still fuse the
+answer, and a degraded turn can finish with no lane row at all — both are nameable only from the
+turn. (2) The backfill is a versioned migration (`PRAGMA user_version`), atomic with its version
+bump, using a frozen map of what ran before snapshots existed; "NULL means old" is true exactly
+once, so it is applied exactly once. (3) Labels and cutoffs are keyed by model id, and an unknown
+id is shown as itself with an unknown cutoff — a model set in `.env` used to inherit the
+default's name. The snapshot records the id we asked the CLI for; an alias is resolved by the
+vendor and not reported back. Prompts, history replay and SSE event shapes are unchanged.
+

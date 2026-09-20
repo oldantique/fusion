@@ -4,28 +4,47 @@ export type ProviderId = "claude" | "codex" | "kimi" | "grok";
 
 export const ALL_PROVIDERS: readonly ProviderId[] = ["claude", "codex", "kimi", "grok"] as const;
 
-export const PROVIDER_LABELS: Record<ProviderId, string> = {
-  claude: "Claude Opus 5",
-  codex: "GPT-6 Astra",
-  kimi: "Kimi K3",
-  grok: "Grok 4.6",
+/**
+ * What we know about a model id each CLI accepts: the name shown in the UI and the vendor-stated
+ * knowledge cutoff (the lanes run offline, so that is the edge of what they know). Keyed by model,
+ * not by provider: a lane whose model is changed in `.env` must not inherit the default's name.
+ * Home of these facts; cutoffs verified against the vendors' model pages (2026-08-21, codex
+ * 2026-09-20) — add a row when a model in `.env` changes:
+ *   claude → platform.claude.com/docs/en/about-claude/models/overview
+ *   codex  → developers.openai.com/api/docs/models/<id>
+ *   grok   → docs.x.ai/developers/grok-4-6
+ *   kimi   → K3: no cutoff published (model card, docs and tech report checked) — `null`.
+ */
+const KNOWN_MODELS: Record<ProviderId, Record<string, { label: string; cutoff: string | null }>> = {
+  claude: { opus: { label: "Claude Opus 5", cutoff: "2026-05" } },
+  codex: {
+    "gpt-6-astra": { label: "GPT-6 Astra", cutoff: "2026-04" },
+    "gpt-5.6-sol": { label: "GPT-5.6 Sol", cutoff: "2026-02" },
+  },
+  kimi: { "kimi-code/k3": { label: "Kimi K3", cutoff: null } },
+  grok: { "grok-4.6": { label: "Grok 4.6", cutoff: "2026-02" } },
 };
 
+export interface ModelInfo {
+  model: string;
+  label: string;
+  /** Vendor-stated cutoff; `null` = the vendor publishes none, or (when `known` is false) we never looked. */
+  cutoff: string | null;
+  known: boolean;
+}
+
+/** A model we have no row for is shown by its literal id: a true name beats a familiar wrong one. */
+export function modelInfo(id: ProviderId, model: string): ModelInfo {
+  const hit = KNOWN_MODELS[id][model];
+  return hit ? { model, ...hit, known: true } : { model, label: model, cutoff: null, known: false };
+}
+
 /**
- * Vendor-stated knowledge cutoff of the model each label names, shown as a tooltip in the UI
- * (the lanes run offline, so this is the edge of what they know). Home of this fact; verified
- * 2026-08-21 against the vendors' model pages — re-check when a model in `.env` changes:
- *   claude → Opus 5: platform.claude.com/docs/en/about-claude/models/overview
- *   codex  → GPT-6 Astra: developers.openai.com/api/docs/models/gpt-6-astra (checked 2026-09-20)
- *   grok   → Grok 4.6: docs.x.ai/developers/grok-4-6
- *   kimi   → K3: no cutoff published (model card, docs and tech report checked).
+ * The model each provider was configured with when a turn started, stored with the turn so that
+ * history keeps naming what answered it after a lane's model changes. It records the model id we
+ * *asked* the CLI for; an alias ("opus") is resolved by the vendor and not reported back.
  */
-export const PROVIDER_CUTOFFS: Record<ProviderId, string | null> = {
-  claude: "2026-05",
-  codex: "2026-04",
-  kimi: null,
-  grok: "2026-02",
-};
+export type ModelSnapshot = Partial<Record<ProviderId, { model: string; label: string }>>;
 
 /**
  * Why a call failed. Drives the retry decision in `runLane`: only `exit` (non-zero exit, cause

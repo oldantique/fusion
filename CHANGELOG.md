@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- History keeps naming the model that answered: each turn stores the model every provider was
+  configured with, and the UI names lanes, the synthesizer and the analysis from that snapshot.
+  Existing turns are backfilled once (they all ran on the defaults of the time). Names and
+  cutoffs are now looked up by model id, so a model set in `.env` is shown as itself.
 - The codex lane's default model is now GPT-6 Astra (`CODEX_MODEL=gpt-6-astra`); its label and
   knowledge cutoff in the UI follow.
 - All four CLIs re-verified after a month of silent self-updates, kimi across a major version;

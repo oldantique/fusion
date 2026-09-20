@@ -22,7 +22,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import readline from "node:readline";
 import { config } from "../config.ts";
 import type { CallOptions, LaneErrorKind, LaneEvent, Provider, Usage } from "../types.ts";
-import { PROVIDER_LABELS } from "../types.ts";
+import { modelInfo } from "../types.ts";
 import { classifyFailure } from "./base.ts";
 import { childEnv, jailArgv, type JailMounts } from "./process.ts";
 
@@ -470,7 +470,7 @@ export const codexDaemon = new CodexDaemon();
 
 export const codexAppServer: Provider = {
   id: "codex",
-  label: PROVIDER_LABELS.codex,
+  label: modelInfo("codex", config.models.codex).label,
   streams: true,
   supportsJsonSchema: false,
   call: (opts) => codexTurn(codexDaemon, opts),

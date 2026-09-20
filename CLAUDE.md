@@ -119,5 +119,9 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
 - `runLane` never rejects and `fuse()` takes its providers as an injectable dependency; keep it
   that way, the orchestration tests depend on it.
 - The synthesizer sees candidates as anonymized letters; names are mapped back only in the UI.
+- Names inside a turn come from the model snapshot stored with that turn (`turns.models_json`),
+  never from the live provider list — otherwise changing a lane's model renames history. A new
+  model gets a row in `KNOWN_MODELS` (`src/types.ts`); never edit the frozen backfill map in
+  `src/store/db.ts`.
 - All model output is rendered through DOMPurify. The only markup allowed past it is KaTeX's own
   output and re-sanitised mermaid SVG — see `render()` in `web/app.js`; never add a third.

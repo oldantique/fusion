@@ -195,3 +195,20 @@ test("a reconnect during a synthesizer fallback replays the winning attempt, not
   const done = replay.find((e) => e.type === "synth" && e.status === "done") as any;
   assert.equal(done.result.answer, "fused");
 });
+
+test("a turn stores the models of all four providers before fuse runs, selected or not", async () => {
+  const store = new Store(":memory:");
+  const conv = store.createConversation("t");
+  const snapshot = { claude: { model: "opus", label: "Claude Opus 5" }, codex: { model: "gpt-5.6-sol", label: "GPT-5.6 Sol" } };
+  const jobs = new Jobs(store, fakeFuse().impl, () => snapshot);
+  const turnId = jobs.start(conv.id, "q", ["grok"]);
+  // claude is not a selected lane, yet it is the first synthesizer: it must be nameable from the turn
+  assert.deepEqual(store.getTurn(turnId)!.models, snapshot);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const real = new Jobs(store, fakeFuse().impl);
+  const conv2 = store.createConversation("t2");
+  const t2 = store.getTurn(real.start(conv2.id, "q", ["grok"]))!;
+  assert.deepEqual(Object.keys(t2.models!).sort(), ["claude", "codex", "grok", "kimi"]);
+  await new Promise((r) => setTimeout(r, 20));
+});

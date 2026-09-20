@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.ts";
-import type { Analysis, HistoryTurn, LaneResult, ProviderId, SynthesisResult } from "../types.ts";
+import type { Analysis, HistoryTurn, LaneResult, ModelSnapshot, ProviderId, SynthesisResult } from "../types.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS turns (
   synth_provider TEXT,
   synth_ms INTEGER,
   providers_json TEXT NOT NULL,
+  models_json TEXT,                -- ModelSnapshot: what each provider was configured with
   history_omitted INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL,            -- running | done | failed | cancelled
   error TEXT,
@@ -44,6 +45,20 @@ CREATE TABLE IF NOT EXISTS lane_results (
   PRIMARY KEY (turn_id, provider)
 );
 `;
+
+/**
+ * Migration 1's backfill, frozen: what every turn ran on before turns recorded it. These were the
+ * defaults from the first commit until the codex lane moved to GPT-6 Astra (2026-09-20), and the
+ * labels are as the UI showed them then. Never derive this from current config or labels — that
+ * is the misattribution the snapshot exists to prevent. A deployment that overrode a model in
+ * `.env` before this migration gets the default's name for those turns, as it always did.
+ */
+const MODELS_BEFORE_SNAPSHOTS: ModelSnapshot = {
+  claude: { model: "opus", label: "Claude Opus 5" },
+  codex: { model: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+  kimi: { model: "kimi-code/k3", label: "Kimi K3" },
+  grok: { model: "grok-4.6", label: "Grok 4.6" },
+};
 
 export interface ConversationRow {
   id: string;
@@ -66,6 +81,8 @@ export interface TurnRow {
   /** Set when `answer` is one lane's raw answer (single lane, or synthesis failed) rather than a synthesis. */
   answer_provider: ProviderId | null;
   providers: ProviderId[];
+  /** `null` only for a row some older build wrote after the backfill: unknown, never "current". */
+  models: ModelSnapshot | null;
   history_omitted: number;
   status: "running" | "done" | "failed" | "cancelled";
   error: string | null;
@@ -94,6 +111,28 @@ export class Store {
       } catch (e) {
         if (!/duplicate column/i.test(String(e))) throw e;
       }
+    }
+    this.migrate();
+  }
+
+  /**
+   * Versioned data migrations (`PRAGMA user_version`), each atomic with its version bump: a crash
+   * leaves it not run, never half run. The ALTER loop above only proves a column exists; it cannot
+   * say whether a backfill happened, and "NULL means old" stops being true the day after.
+   */
+  private migrate() {
+    const version = (this.db.prepare("PRAGMA user_version").get() as any).user_version as number;
+    if (version >= 1) return;
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const cols = this.db.prepare("PRAGMA table_info(turns)").all() as any[];
+      if (!cols.some((c) => c.name === "models_json")) this.db.exec("ALTER TABLE turns ADD COLUMN models_json TEXT");
+      this.db.prepare("UPDATE turns SET models_json = ? WHERE models_json IS NULL").run(JSON.stringify(MODELS_BEFORE_SNAPSHOTS));
+      this.db.exec("PRAGMA user_version = 1");
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
     }
   }
 
@@ -145,16 +184,16 @@ export class Store {
     return rows.map((r) => ({ question: r.question, answer: r.answer }));
   }
 
-  startTurn(conversationId: string, question: string, providers: ProviderId[]): TurnRow {
+  startTurn(conversationId: string, question: string, providers: ProviderId[], models: ModelSnapshot): TurnRow {
     const id = randomUUID();
     const now = Date.now();
     const idx = (this.db.prepare("SELECT COALESCE(MAX(idx), -1) + 1 AS n FROM turns WHERE conversation_id = ?").get(conversationId) as any).n as number;
     this.db
       .prepare(
-        `INSERT INTO turns (id, conversation_id, idx, question, providers_json, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'running', ?)`,
+        `INSERT INTO turns (id, conversation_id, idx, question, providers_json, models_json, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'running', ?)`,
       )
-      .run(id, conversationId, idx, question, JSON.stringify(providers), now);
+      .run(id, conversationId, idx, question, JSON.stringify(providers), JSON.stringify(models), now);
     this.db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(now, conversationId);
     return this.getTurn(id)!;
   }
@@ -237,6 +276,7 @@ export class Store {
       synth_ms: r.synth_ms,
       answer_provider: r.answer_provider ?? null,
       providers: JSON.parse(r.providers_json),
+      models: r.models_json ? JSON.parse(r.models_json) : null,
       history_omitted: r.history_omitted,
       status: r.status,
       error: r.error,
