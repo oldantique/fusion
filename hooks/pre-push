@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # The remote is public and CI only reports after the fact: keep a red or leaky commit off it.
 # Install: git config core.hooksPath hooks
-npm test --silent >/dev/null 2>&1 || { echo "pre-push: npm test fails — run it to see why." >&2; exit 1; }
-npm run -s typecheck >/dev/null 2>&1 || { echo "pre-push: npm run typecheck fails." >&2; exit 1; }
+# The checks run on a clean export of HEAD, not in the working tree: that is what CI sees, so a
+# test leaning on runtime state (data/), on .env or on a file nobody committed fails here first.
+root=$(git rev-parse --show-toplevel)
+clean=$(mktemp -d) && trap 'rm -rf "$clean"' EXIT
+git archive HEAD | tar -x -C "$clean" && ln -s "$root/node_modules" "$clean/node_modules"
+(cd "$clean" && npm test --silent >/dev/null 2>&1) || { echo "pre-push: npm test fails on a clean checkout of HEAD — try it in a fresh clone." >&2; exit 1; }
+(cd "$clean" && npm run -s typecheck >/dev/null 2>&1) || { echo "pre-push: npm run typecheck fails on a clean checkout of HEAD." >&2; exit 1; }
 # Owner-only facts outside the captured fixtures (which keep their paths on purpose).
 if hits=$(git grep -nIF -e "$HOME/" -e "@gmail.com" -- . ':!fixtures' ':!hooks'); then
   echo "pre-push: a personal path or address is tracked — generalise it:" >&2; echo "$hits" | head >&2; exit 1

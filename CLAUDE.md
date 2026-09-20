@@ -29,8 +29,9 @@ true — is the `sync-docs` skill (`.claude/skills/sync-docs/SKILL.md`), invoked
 
 A promise that a commit or a push can break is enforced where it lands, not remembered:
 `hooks/pre-commit` (frozen fixtures, secrets, lane code only on verified CLI builds) and
-`hooks/pre-push` (tests, typecheck, no personal paths). A fresh clone enables them with
-`git config core.hooksPath hooks`; when adding a "never" to this file, ask whether a hook can hold it.
+`hooks/pre-push` (tests and typecheck on a clean export of HEAD, no personal paths). A fresh
+clone enables them with `git config core.hooksPath hooks`; when adding a "never" to this file,
+ask whether a hook can hold it.
 
 ## Conventions
 
