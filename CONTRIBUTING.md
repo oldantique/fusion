@@ -10,6 +10,7 @@ maintainer and the agents working in it follow.
 npm install          # postinstall bundles the frontend libs into web/vendor/
 cp .env.example .env # set at least the password and the cookie secret
 npm run doctor       # which CLIs are installed and logged in, and whether bwrap works
+git config core.hooksPath hooks   # the commit and push gates; each hook's header says what it refuses
 ```
 
 You do not need all four CLIs — untick the ones you do not have. You do not need any of them to

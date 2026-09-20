@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Git hooks in `hooks/` enforce what was only written down: captured fixtures are frozen, secrets
+  stay out, lane code and fixtures change only while every installed CLI is a verified build
+  (`npm run check-updates -- --strict --offline`), and a push needs green tests and typecheck.
 - UI: the offline / training-cutoff notice moved from the composer to the empty state of a
   conversation, so it is read before the first question and no longer occupies every composer.
 

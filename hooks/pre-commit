@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Promises a session can break by forgetting, checked at the one moment guaranteed to come before
+# the damage. Staged content only. Install: git config core.hooksPath hooks
+staged() { git diff --cached --name-only --diff-filter="$1"; }
+
+# 1. Captured CLI output is frozen: a format change is a NEW fixture, never an edit.
+if bad=$(staged MDR | grep -E '^fixtures/.*\.ndjson$'); then
+  echo "pre-commit: captured fixtures are frozen — capture a new file and add a fixtures/README.md row:" >&2
+  echo "$bad" >&2; exit 1
+fi
+
+# 2. Secrets never enter a public repo.
+if staged ACMR | grep -qE '(^|/)\.env$'; then
+  echo "pre-commit: .env is staged — it holds the password and cookie secret." >&2; exit 1
+fi
+if git diff --cached -U0 | grep -E '^\+' | grep -qE 'sk-[A-Za-z0-9_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY'; then
+  echo "pre-commit: staged content contains what looks like a real key." >&2; exit 1
+fi
+
+# 3. Lane code and the verified-versions record may only change while every installed CLI is the
+#    build the parsers were verified on. The CLIs update themselves silently; without this a parser
+#    fact measured on build N+1 lands next to rows that vouch for N.
+if staged ACMR | grep -qE '^(src/providers/|src/parsers/|fixtures/)'; then
+  if ! out=$(npm run -s check-updates -- --strict --offline 2>&1); then
+    echo "pre-commit: lane code or fixtures are staged, but a CLI is running an unverified build:" >&2
+    echo "$out" | grep -E 'RE-VERIFY|→' >&2
+    echo "(a fixtures/README.md row for the installed build clears this; --no-verify is for a wording-only edit)" >&2
+    exit 1
+  fi
+fi
+exit 0

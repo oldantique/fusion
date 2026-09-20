@@ -19,6 +19,8 @@
  *
  * Usage: npm run check-updates                          the three-column table
  *        npm run check-updates -- --strict              exit 1 on installed > last-verified
+ *        npm run check-updates -- --strict --offline    the same without the registry lookup — what
+ *                                                       `hooks/pre-commit` runs
  *        npm run check-updates -- --help-diff           diff `--help` against the snapshots
  *        npm run check-updates -- --help-diff --update  rewrite the snapshots
  * `--strict` turns either kind of drift into exit 1, so a hook or CI job can fail on it.
@@ -232,13 +234,13 @@ async function helpDiff(update: boolean): Promise<number> {
 
 // --- table -------------------------------------------------------------------------------
 
-async function table(): Promise<number> {
+async function table(offline: boolean): Promise<number> {
   const verified = verifiedVersions(fs.readFileSync(FIXTURES_README, "utf8"));
   const rows = await Promise.all(
     CLIS.map(async (cli) => {
       const [installed, latest] = await Promise.all([
         cliVersion(cli.id, cli.versionArgs).then(extractVersion),
-        latestOnNpm(cli.pkg),
+        offline ? null : latestOnNpm(cli.pkg),
       ]);
       return { id: cli.id, verified: verified.get(cli.id) ?? null, installed, latest };
     }),
@@ -261,7 +263,7 @@ async function table(): Promise<number> {
     } else if (cmpVersion(r.installed, r.verified) < 0) {
       notes.push(warn("older than the verified build"));
     }
-    if (r.latest === null) notes.push(dim("upstream unreachable"));
+    if (r.latest === null) notes.push(dim(offline ? "upstream not checked" : "upstream unreachable"));
     else if (r.installed && cmpVersion(r.latest, r.installed) > 0) {
       behind.push(r.id);
       notes.push("upstream is newer");
@@ -286,6 +288,6 @@ async function table(): Promise<number> {
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
   const strict = args.includes("--strict");
-  const problems = args.includes("--help-diff") ? await helpDiff(args.includes("--update")) : await table();
+  const problems = args.includes("--help-diff") ? await helpDiff(args.includes("--update")) : await table(args.includes("--offline"));
   process.exit(strict && problems ? 1 : 0);
 }

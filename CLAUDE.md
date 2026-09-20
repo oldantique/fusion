@@ -27,6 +27,11 @@ actually exists; it runs as part of `npm test`. The judgement half — are the s
 true — is the `sync-docs` skill (`.claude/skills/sync-docs/SKILL.md`), invoked only by the
 `/sync-docs` command: after a chunk of work and before compacting.
 
+A promise that a commit or a push can break is enforced where it lands, not remembered:
+`hooks/pre-commit` (frozen fixtures, secrets, lane code only on verified CLI builds) and
+`hooks/pre-push` (tests, typecheck, no personal paths). A fresh clone enables them with
+`git config core.hooksPath hooks`; when adding a "never" to this file, ask whether a hook can hold it.
+
 ## Conventions
 
 - Code, comments, docs, commits, UI copy: **English**, always. (Spoken conversation with this
