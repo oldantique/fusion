@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The codex lane's default model is now GPT-6 Astra (`CODEX_MODEL=gpt-6-astra`); its label and
+  knowledge cutoff in the UI follow.
 - All four CLIs re-verified after a month of silent self-updates, kimi across a major version;
   parsers and fixtures unchanged. The claude lane now passes `--strict-mcp-config` (the account's
   claude.ai connectors were visible to it as pending MCP servers), the grok lane removes the new

@@ -105,7 +105,7 @@ export const config = {
 
   models: {
     claude: process.env.CLAUDE_MODEL ?? "opus",
-    codex: process.env.CODEX_MODEL ?? "gpt-5.6-sol",
+    codex: process.env.CODEX_MODEL ?? "gpt-6-astra",
     kimi: process.env.KIMI_MODEL ?? "kimi-code/k3",
     grok: process.env.GROK_MODEL ?? "grok-4.6",
   },
