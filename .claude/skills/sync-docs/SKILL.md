@@ -23,7 +23,7 @@ config that owns the value.
 ## Scope
 
 **Living (edit in place):** `CLAUDE.md` · `README.md` · `SECURITY.md` · `CONTRIBUTING.md` ·
-`.github/` templates · `docs/RUNBOOK.md` · `docs/THREADS.md` · `.env.example` (comments are the config documentation) · `fixtures/README.md` ·
+`.github/` · `docs/RUNBOOK.md` · `docs/THREADS.md` · `docs/screenshot.png` · `.env.example` (comments are the config documentation) · `fixtures/README.md` ·
 `deploy/fusion.service` header · file-header comments in `src/` and `scripts/` (this repo's
 convention: subsystem rules live in the code that implements them) · this skill.
 
@@ -31,7 +31,7 @@ convention: subsystem rules live in the code that implements them) · this skill
 back) · `CHANGELOG.md` (`Unreleased` accumulates; a release turns it into a version heading).
 
 **Frozen — never edit in a sync:** `fixtures/*.ndjson` (captured CLI output — capture a new
-file instead) · `data/` (runtime, gitignored) · `.env` (secrets).
+file instead; `fixtures/help/` is the opposite, a baseline rewritten after each verified upgrade) · `data/` (runtime, gitignored) · `.env` (secrets).
 
 **Memory** (Claude Code's per-project memory directory, outside git): preferences,
 workflow lessons and pointers only — nothing derivable from the repo. Update an existing file
@@ -51,7 +51,9 @@ paths by hand.
 - `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run check-updates` lists
   installed-but-unverified CLIs and `--help-diff` shows new flags), `npm run smoke` must pass; a
   changed output format means a new fixture, a new row in `fixtures/README.md`, and parser + test
-  updates in the same commit. Premises a CLI upgrade can invalidate are re-tested, not assumed:
+  updates in the same commit. The CLIs update themselves: the version in the new row is the one
+  `check-updates` prints *after* the verification runs, and a changed `--help` is accepted with
+  `npm run check-updates -- --help-diff --update`. Premises a CLI upgrade can invalidate are re-tested, not assumed:
   no token deltas from kimi or `codex exec`; the account-language override; grok's
   `--disallowed-tools` not being a block and its `--json-schema` streaming as text deltas;
   codex's app-server schema (regenerated per version); `-p` not yet defaulting to `--bare`
@@ -66,6 +68,9 @@ paths by hand.
 - `release-triple` — at a release, `package.json` `version`, the git tag and the newest
   `CHANGELOG.md` heading are the same string, `Unreleased` is empty, and the tag and a GitHub
   release with the CHANGELOG section are pushed.
+- `screenshot-current` — if `web/` changed since the last sync, open `docs/screenshot.png` and
+  compare it with the UI; anything visible in it that moved or went away means a retake — from a
+  throwaway conversation, light theme, sidebar collapsed (the conversation list is the owner's).
 - `no-owner-facts` — the repo is public: nothing in the living set states as project truth what
   is only true of the owner's account, machine or paths ("this host", "this account", a clone
   path); generalize the condition instead. Fixtures keep their captured paths (owner's call).
