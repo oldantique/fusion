@@ -71,7 +71,9 @@ paths by hand.
   release with the CHANGELOG section are pushed.
 - `screenshot-current` — if `web/` changed since the last sync, open `docs/screenshot.png` and
   compare it with the UI; anything visible in it that moved or went away means a retake — from a
-  throwaway conversation, light theme, sidebar collapsed (the conversation list is the owner's).
+  throwaway conversation, light theme, sidebar collapsed (the conversation list is the owner's),
+  palette-quantized without dithering (dithering speckles the flat backgrounds); look at the
+  result before committing it. A model label change counts: the lane names are in the picture.
 - `no-owner-facts` — the repo is public: nothing in the living set states as project truth what
   is only true of the owner's account, machine or paths ("this host", "this account", a clone
   path); generalize the condition instead. Fixtures keep their captured paths (owner's call).
