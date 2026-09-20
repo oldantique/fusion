@@ -41,6 +41,10 @@ export const claude: Provider = cliProvider({
       opts.system,
       "--setting-sources",
       "",
+      // `--tools ""` only governs built-in tools. The account's claude.ai connectors are MCP
+      // servers registered in ~/.claude.json (mounted for OAuth) and show up in the lane as
+      // "pending"; nothing connects them today, but only this flag makes that structural.
+      "--strict-mcp-config",
       "--disable-slash-commands",
       "--no-session-persistence",
       "--output-format",
@@ -98,7 +102,8 @@ export const kimi: Provider = cliProvider({
   // whole; the agent file lives in this repo and must be visible too.
   mounts: { rw: ["~/.kimi-code"], ro: [KIMI_AGENT_FILE] },
   build(opts) {
-    // Effort lives in ~/.kimi-code/config.toml ([thinking] effort); k3 defaults to high.
+    // Effort lives in ~/.kimi-code/config.toml ([thinking] effort); the default is whatever the
+    // vendor's model catalog in that file says, and it has moved between releases.
     // There is no per-call flag, so opts.effort cannot be honoured here.
     // `-p` has no permission gate and no tool flag: by default the model gets the full tool set
     // (Bash, Edit, WebSearch, …). The only hard switch is an agent definition whose frontmatter
@@ -133,6 +138,10 @@ export const grok: Provider = cliProvider({
       "--reasoning-effort",
       opts.effort ?? config.effort,
       ...deny.flatMap((d) => ["--deny", d]),
+      // send_feedback (an outward call to the vendor) has no --deny prefix; --disallowed-tools does
+      // remove a non-shell tool from the list the model is given.
+      "--disallowed-tools",
+      "send_feedback",
       "--disable-web-search",
       "--no-subagents",
       "--output-format",

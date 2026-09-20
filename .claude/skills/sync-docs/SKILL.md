@@ -56,8 +56,9 @@ paths by hand.
   `npm run check-updates -- --help-diff --update`. Premises a CLI upgrade can invalidate are re-tested, not assumed:
   no token deltas from kimi or `codex exec`; the account-language override; grok's
   `--disallowed-tools` not being a block and its `--json-schema` streaming as text deltas;
-  codex's app-server schema (regenerated per version); `-p` not yet defaulting to `--bare`
-  (THREADS #17).
+  codex's app-server schema (regenerated per version, incl. new `codexErrorInfo` variants);
+  `-p` not yet defaulting to `--bare` (THREADS #17); and the init line of a fresh claude and grok
+  capture — a tool or MCP server that no block names is invisible to `--help-diff`.
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads
   (mechanical) **and** each comment still describes the effect (by eye).
 - `threads-current` — every THREADS row's state matches reality; finished rows move to Archive

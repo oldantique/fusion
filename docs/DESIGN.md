@@ -354,3 +354,22 @@ bisecting needs both. One daemon serializing every codex turn also satisfies Ope
 one-`auth.json`-per-stream request more literally than N concurrent exec processes did; the
 concurrency cap of one is unchanged. The `Provider` interface did not need to change: `call()`
 was already an async generator, which is all a non-spawn-per-call provider needs.
+
+## 2026-09-20 — Tool blocks are compared against what the CLI actually offers, not against `--help`
+
+A re-verification of all four CLIs found two channels the existing tool blocks never named, and
+neither was visible in any `--help` diff. claude: `--tools ""` governs built-in tools only; the
+account's claude.ai connectors are MCP servers registered in `~/.claude.json` — which the jail
+mounts, because OAuth lives there — and the lane listed one as a pending server. Nothing connects
+it in a headless run today, but that is an absence of opportunity, not a guarantee, so the lane
+passes `--strict-mcp-config` with no config. grok: the wire `system.tools` list gained a
+vendor-feedback tool. `--deny` has no prefix for it (an unknown prefix exits 1, a bare name is
+silently ignored), but `--disallowed-tools` does remove non-shell names, so it is used for exactly
+that and the shell tool stays on `--deny`. Neither tool reads files or the web — the jail and the
+offline flags were never bypassed — but both are outward calls a lane has no business making.
+The lesson for the next upgrade is procedural and lives in the sync-docs skill: diff the tool and
+server lists in a fresh capture's init line, because a new tool is not a new flag.
+
+Also recorded: codex's typed error set gained a rate-limit variant; an untyped quota error falls
+to the retry path and burns quota, so new variants of that enum are checked on every upgrade.
+

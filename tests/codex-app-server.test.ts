@@ -243,6 +243,8 @@ test("an interrupt the server never acknowledges kills the daemon (stuck turn) a
 
 test("classifyTurnError: the typed codexErrorInfo decides before the message regex", () => {
   assert.equal(classifyTurnError({ message: "You have hit your usage limit", codexErrorInfo: "usageLimitExceeded" }).kind, "rate_limit");
+  // a variant the schema gained later; its message carries none of the words the text fallback looks for
+  assert.equal(classifyTurnError({ message: "slow down", codexErrorInfo: "rateLimitExceeded" }).kind, "rate_limit");
   assert.equal(classifyTurnError({ message: "boom", codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 502 } } }).kind, "exit");
   assert.equal(classifyTurnError({ message: "HTTP 429 Too Many Requests" }).kind, "rate_limit");
   assert.equal(classifyTurnError(null).message, "codex turn failed");

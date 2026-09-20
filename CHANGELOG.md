@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- All four CLIs re-verified after a month of silent self-updates, kimi across a major version;
+  parsers and fixtures unchanged. The claude lane now passes `--strict-mcp-config` (the account's
+  claude.ai connectors were visible to it as pending MCP servers), the grok lane removes the new
+  `send_feedback` tool, and codex's new `rateLimitExceeded` error is treated as a quota error
+  instead of being retried.
 - Git hooks in `hooks/` enforce what was only written down: captured fixtures are frozen, secrets
   stay out, lane code and fixtures change only while every installed CLI is a verified build
   (`npm run check-updates -- --strict --offline`), and a push needs green tests and typecheck.

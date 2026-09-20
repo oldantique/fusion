@@ -319,7 +319,7 @@ export function classifyTurnError(err: { message?: string; codexErrorInfo?: unkn
   const message = String(err?.message ?? "codex turn failed");
   const info = err?.codexErrorInfo;
   const code = typeof info === "string" ? info : info && typeof info === "object" ? Object.keys(info)[0] : undefined;
-  if (code === "usageLimitExceeded" || code === "serverOverloaded") return { message, kind: "rate_limit" };
+  if (code === "usageLimitExceeded" || code === "rateLimitExceeded" || code === "serverOverloaded") return { message, kind: "rate_limit" };
   return { message, kind: classifyFailure(message, "exit") };
 }
 

@@ -71,6 +71,9 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   read a file outside it. The tool blocks below are the second layer, not the containment.
 - **Never pass `--bare` to claude** — it disables OAuth and would demand an API key. Anthropic
   says it will become the `-p` default; see THREADS #17 before every claude upgrade.
+- **claude's `--tools ""` does not cover MCP**: the account's claude.ai connectors are registered
+  in the mounted `~/.claude.json` and appear in the lane as pending servers; `--strict-mcp-config`
+  (with no config given) is what keeps that channel closed. Do not drop it.
 - **A CLI can inject an account-level output language** that wins over the question's language:
   claude does it for an account whose preference is set (observed with Chinese) and no flag
   disables it. Only the emphatic language line in `src/synth/prompts.ts` overrides it — verified
@@ -83,21 +86,25 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   no token deltas, and pays a cold start per call. Disabling codex's tools defeats the prompt
   cache and costs more — keep the default tool set. Concurrency cap defaults to one (OpenAI's CI/CD auth docs: one
   `auth.json` per serialised stream — a token-refresh durability rule, not a licence term; one
-  daemon serialising turns is exactly that). `app-server` and `mcp-server` ignore the codex API-key environment variable — subscription auth (`~/.codex/auth.json`) only.
-  The first `thread/start` after a daemon spawn is slow inside the jail (its model-list refresh
-  times out); every later one is instant.
+  daemon serialising turns is exactly that). `app-server` ignores the codex API-key environment
+  variable — subscription auth (`~/.codex/auth.json`) only. The CLI also has an opt-in *shared*
+  app-server daemon; ours is a standalone one over stdio and never attaches to it. The first
+  `thread/start` after the model cache under `~/.codex` goes stale pays a refresh round trip;
+  every later one is instant, and the mount is writable so the cache outlives the daemon.
 - **grok**'s `--disallowed-tools` is not a block: it trims some names from the advertised tool
   list but never the shell one, and the model still reads files through it. Only effect-scoped
   `--deny 'Tool(**)'` rules stop a call, and not every tool name is a valid prefix (the CLI exits
   1 on an unknown one; the valid set is the list in its provider definition). Its
   `streaming-messages-json` is wire-compatible with claude's stream, and `--json-schema` keeps
   streaming in that format even though `--help` says it implies `--output-format json`.
-  `--system-prompt-override` defeats the prompt cache.
+  `--system-prompt-override` defeats the prompt cache. A tool with no `--deny` prefix (the
+  vendor-feedback one) is kept out with `--disallowed-tools`, which does work for non-shell names;
+  a new grok build can add another — compare the wire `system.tools` list, not `--help`.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global
-  config only). It is a
-  Node binary and needs the IPv4-fallback option that `childEnv()` appends; on a host whose DNS
+  config only). It embeds
+  Node (a single-file executable that still honours `NODE_OPTIONS`) and needs the IPv4-fallback option that `childEnv()` appends; on a host whose DNS
   answers AAAA but has no working IPv6 egress, every call fails with an OAuth "fetch failed"
   without it (an interactive shell usually gets the same option from `.bashrc`, which is why the
   failure shows up only under the service).

@@ -10,10 +10,11 @@ Options:
                                 interactively pick.
   -c, --continue                Continue the previous session for the working directory. (default:
                                 false)
-  -y, --yolo                    Auto-approve regular tool calls; the agent may still ask questions.
+  -y, --yolo                    Start in Ask When Needed mode: routine edits and commands run
+                                automatically; risky actions, questions, and plans still ask.
                                 (default: false)
-  --auto                        Start in auto permission mode: fully autonomous, the agent will not
-                                ask questions. (default: false)
+  --auto                        Start in Never Ask mode: never interrupts you; everything runs and
+                                is decided automatically. (default: false)
   -m, --model <model>           LLM model alias to use for this invocation. Defaults to
                                 default_model in config.toml.
   -p, --prompt <prompt>         Run one prompt non-interactively and print the response.
@@ -34,14 +35,19 @@ Options:
 
 Commands:
   export [options] [sessionId]  Export a session as a ZIP archive.
+  fork [options] [sessionId]    Fork a session into a new session.
   provider                      Manage LLM providers non-interactively.
+  session                       Manage sessions non-interactively.
   acp [options]                 Run kimi-code as an Agent Client Protocol (ACP) server over stdio.
   web [options]                 Run the local Kimi server and open the web UI.
   server                        Deprecated — use `kimi web` instead.
+  rc|remote [options]           Run the local Kimi server and open the web UI through Remote
+                                Control.
   login [options]               Authenticate with Kimi Code CLI via the device-code flow.
   doctor                        Validate Kimi Code configuration files.
   vis [options] [sessionId]     Launch the session visualizer in your browser.
-  migrate                       Migrate data from a legacy kimi-cli installation into kimi-code.
-  upgrade|update                Upgrade Kimi Code to the latest version.
+  install-desktop               Print the Kimi Code desktop app page and open it in your browser.
+  migrate [options]             Migrate data from a legacy kimi-cli installation into kimi-code.
+  upgrade|update [options]      Upgrade Kimi Code to the latest version.
 
 Documentation:        https://moonshotai.github.io/kimi-code/
