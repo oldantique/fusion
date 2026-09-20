@@ -23,15 +23,17 @@ config that owns the value.
 ## Scope
 
 **Living (edit in place):** `CLAUDE.md` · `README.md` · `SECURITY.md` · `CONTRIBUTING.md` ·
-`.github/` · `docs/RUNBOOK.md` · `docs/THREADS.md` · `docs/screenshot.png` · `.env.example` (comments are the config documentation) · `fixtures/README.md` ·
-`deploy/fusion.service` header · file-header comments in `src/` and `scripts/` (this repo's
-convention: subsystem rules live in the code that implements them) · this skill.
+`.github/` · `docs/RUNBOOK.md` · `docs/THREADS.md` · `docs/screenshot.png` · `.env.example`
+(comments are the config documentation) · `fixtures/README.md` · `deploy/fusion.service` header ·
+`hooks/` (each header says what it refuses) · file-header comments in `src/` and `scripts/` (this
+repo's convention: subsystem rules live in the code that implements them) · this skill.
 
 **Append-only:** `docs/DESIGN.md` (dated decision entries; a reversal is a new entry pointing
 back) · `CHANGELOG.md` (`Unreleased` accumulates; a release turns it into a version heading).
 
 **Frozen — never edit in a sync:** `fixtures/*.ndjson` (captured CLI output — capture a new
-file instead; `fixtures/help/` is the opposite, a baseline rewritten after each verified upgrade) · `data/` (runtime, gitignored) · `.env` (secrets).
+file instead; `fixtures/help/` is the opposite, a baseline rewritten after each verified
+upgrade) · `data/` (runtime, gitignored) · `.env` (secrets).
 
 **Memory** (Claude Code's per-project memory directory, outside git): preferences,
 workflow lessons and pointers only — nothing derivable from the repo. Update an existing file
@@ -48,17 +50,15 @@ paths by hand.
   claim + pointer. An event type or status added to or retired from the `FuseEvent`/`JobEvent`
   union (`src/synth/fuse.ts`, `src/server/jobs.ts`) has its handler added to or removed from
   `web/app.js`.
-- `cli-upgrade-recapture` — if any of the four CLIs was upgraded (`npm run check-updates` lists
-  installed-but-unverified CLIs and `--help-diff` shows new flags), `npm run smoke` must pass; a
-  changed output format means a new fixture, a new row in `fixtures/README.md`, and parser + test
-  updates in the same commit. The CLIs update themselves: the version in the new row is the one
-  `check-updates` prints *after* the verification runs, and a changed `--help` is accepted with
-  `npm run check-updates -- --help-diff --update`. Premises a CLI upgrade can invalidate are re-tested, not assumed:
-  no token deltas from kimi or `codex exec`; the account-language override; grok's
-  `--disallowed-tools` not being a block and its `--json-schema` streaming as text deltas;
-  codex's app-server schema (regenerated per version, incl. new `codexErrorInfo` variants);
-  `-p` not yet defaulting to `--bare` (THREADS #17); and the init line of a fresh claude and grok
-  capture — a tool or MCP server that no block names is invisible to `--help-diff`.
+- `cli-upgrade-recapture` — `npm run check-updates -- --strict --offline` must be clean
+  (`hooks/pre-commit` refuses lane-code commits otherwise; the CLIs update themselves, so expect
+  it). Re-verifying a CLI = `--help-diff`, `npm run smoke`, `npm run canary`, a fresh capture
+  compared with its fixture, and **every CLAUDE.md gotcha about that CLI re-tested, not assumed**
+  (one teammate per CLI works well) — plus what neither a gotcha nor `--help-diff` can show: the
+  tool and MCP-server lists in the capture's init line, and new variants in codex's regenerated
+  app-server schema. Then a `fixtures/README.md` row naming the version `check-updates` prints
+  *after* the runs, and `--help-diff --update`. A changed output format means a new fixture plus
+  parser and test updates in the same commit.
 - `env-comments-true` — `.env.example` names exactly the variables `src/config.ts` reads
   (mechanical) **and** each comment still describes the effect (by eye).
 - `threads-current` — every THREADS row's state matches reality; finished rows move to Archive
@@ -69,17 +69,17 @@ paths by hand.
 - `release-triple` — at a release, `package.json` `version`, the git tag and the newest
   `CHANGELOG.md` heading are the same string, `Unreleased` is empty, and the tag and a GitHub
   release with the CHANGELOG section are pushed.
-- `screenshot-current` — if `web/` changed since the last sync, open `docs/screenshot.png` and
-  compare it with the UI; anything visible in it that moved or went away means a retake — from a
-  throwaway conversation, light theme, sidebar collapsed (the conversation list is the owner's),
-  palette-quantized without dithering (dithering speckles the flat backgrounds); look at the
-  result before committing it. A model label change counts: the lane names are in the picture.
+- `screenshot-current` — if `web/` or a lane's model label changed since the last sync, open
+  `docs/screenshot.png` and compare it with the UI; anything in it that moved, went away or was
+  renamed means a retake: throwaway conversation, light theme, sidebar collapsed (the list is
+  the owner's), quantized without dithering — and look at the compressed file before committing.
 - `no-owner-facts` — the repo is public: nothing in the living set states as project truth what
   is only true of the owner's account, machine or paths ("this host", "this account", a clone
   path); generalize the condition instead. Fixtures keep their captured paths (owner's call).
 - `propagate-premises` — when a load-bearing premise moves (a vendor's terms, a CLI gaining
   streaming, the synthesizer changing), grep the old claim across the living set + memory and
-  fix every dependent sentence in one pass.
+  fix every dependent sentence in one pass. A lane's model changing is the common case: the id
+  (`src/config.ts`, `.env.example`), and the label and vendor-stated cutoff in `src/types.ts`.
 
 ## Method (every pass — the command is the only trigger)
 
