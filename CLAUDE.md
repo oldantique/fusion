@@ -103,9 +103,9 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global
-  config only). It embeds
-  Node (a single-file executable that still honours `NODE_OPTIONS`) and needs the IPv4-fallback option that `childEnv()` appends; on a host whose DNS
-  answers AAAA but has no working IPv6 egress, every call fails with an OAuth "fetch failed"
+  config only). It embeds Node (a single-file executable that still honours `NODE_OPTIONS`) and
+  needs the IPv4-fallback option that `childEnv()` appends; on a host whose DNS answers AAAA
+  but has no working IPv6 egress, every call fails with an OAuth "fetch failed"
   without it (an interactive shell usually gets the same option from `.bashrc`, which is why the
   failure shows up only under the service).
 - The two CLIs with `--json-schema` stream it differently: claude sends the document as

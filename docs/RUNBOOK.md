@@ -43,8 +43,14 @@ hand and noted in `CHANGELOG.md`.
 Then `npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` with the flags in
 `src/providers/index.ts` and compare its output to `fixtures/` (for codex the daemon protocol is
 in `src/providers/codex-app-server.ts` and `codex app-server generate-json-schema --out DIR`
-prints the schema the new build speaks; diff it against the fields that file reads). If the format changed: capture a
-new fixture, record the version in `fixtures/README.md`, adjust the parser, add a test.
+prints the schema the new build speaks; diff it against the fields that file reads, and look
+for new variants of the error enum). If the format changed: capture a new fixture, adjust the
+parser, add a test. Either way the upgrade is not done until `fixtures/README.md` has a row for
+the installed build — `hooks/pre-commit` refuses lane-code commits until then.
+
+A passing smoke does not show a tool the new build added. Read the first line of a fresh claude
+and grok capture: its tool list and MCP-server list must contain nothing the lane's blocks in
+`src/providers/index.ts` do not name. `--help-diff` cannot see this; a new tool is not a new flag.
 
 ## Failure modes
 
@@ -89,8 +95,8 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 - No TLS. Don't port-forward to the public internet; use Tailscale for remote access.
 - Every lane runs inside a bubblewrap jail (`jailArgv` in `src/providers/process.ts`): a fresh
   mount namespace with a tmpfs HOME that holds only that CLI's own state directory, the OS
-  read-only, and the empty sandbox as cwd. The tool blocks (claude and kimi: no tools; grok:
-  the full deny list; codex: its read-only sandbox, web search off, and one long-lived daemon
+  read-only, and the empty sandbox as cwd. The tool blocks (claude: no tools and no MCP
+  servers; kimi: no tools; grok: the full deny list, plus the one tool no deny rule can name; codex: its read-only sandbox, web search off, and one long-lived daemon
   that is jailed the same way as a per-call spawn) are a second layer on top. `npm run canary`
   plants a secret under the real HOME and proves no lane can quote it; run it after a CLI
   upgrade. The CLIs still hold their own OAuth tokens and have network access — the jail
