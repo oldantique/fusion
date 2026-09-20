@@ -1,0 +1,25 @@
+# what the grok lane advertises: npm run check-updates -- --tools-diff
+tool ask_user_question
+tool enter_plan_mode
+tool exit_plan_mode
+tool get_command_or_subagent_output
+tool grep
+tool image_edit
+tool image_gen
+tool image_to_video
+tool kill_command_or_subagent
+tool list_dir
+tool monitor
+tool read_file
+tool reference_to_video
+tool run_terminal_command
+tool scheduler_create
+tool scheduler_delete
+tool scheduler_list
+tool search_replace
+tool search_tool
+tool spawn_subagent
+tool todo_write
+tool use_tool
+tool workflow
+tool write

@@ -103,6 +103,8 @@ export interface CallOptions {
   effort?: string;
   /** Override the configured attempt count (the synthesizer chain uses one attempt per provider). */
   attempts?: number;
+  /** Sees every raw record a spawned CLI prints, before parsing (`check-updates -- --tools-diff`). */
+  onRecord?: (record: unknown) => void;
 }
 
 export interface Provider {

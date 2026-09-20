@@ -58,7 +58,8 @@ See the `scripts` block in `package.json`; the ones you will want: `doctor` (CLI
 logged in, bwrap works), `smoke` (one trivial call per provider with timing), `canary` (no lane
 can read a planted file), `fuse -- "question"` (a full
 turn in the terminal), `check-updates` (installed CLIs vs the versions the fixtures were verified
-against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `check-docs`, `dev`.
+against, plus `--help-diff` for flags that appeared and `--tools-diff` for tools, MCP servers
+and codex error variants that appeared), `test`, `typecheck`, `check-docs`, `dev`.
 
 ## Gotchas (corrected mistakes — do not relearn)
 
@@ -99,7 +100,8 @@ against, plus `--help-diff` for flags that appeared), `test`, `typecheck`, `chec
   streaming in that format even though `--help` says it implies `--output-format json`.
   `--system-prompt-override` defeats the prompt cache. A tool with no `--deny` prefix (the
   vendor-feedback one) is kept out with `--disallowed-tools`, which does work for non-shell names;
-  a new grok build can add another — compare the wire `system.tools` list, not `--help`.
+  a new grok build can add another — `npm run check-updates -- --tools-diff` shows it, `--help`
+  never will.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global

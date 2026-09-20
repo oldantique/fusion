@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `npm run check-updates -- --tools-diff`: baselines of what each lane advertises to its model —
+  tools and MCP servers for claude and grok, error variants for codex — so a CLI upgrade that
+  adds one shows up as a diff instead of being found by reading a capture.
 - A failure a CLI reports inside its own stream now carries that CLI's stderr: grok can end a
   run with an error flag and no message, and the reason (a refusal, a quota) was being dropped.
   The stderr text also takes part in rate-limit detection, and a lane that timed out or was

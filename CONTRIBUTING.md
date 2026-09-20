@@ -59,7 +59,8 @@ record of what changed.
 `fixtures/README.md` records against what is installed and what upstream publishes, and treats
 *installed newer than verified* as the finding. `npm run check-updates -- --help-diff` diffs each
 CLI's `--help` against the committed baselines in `fixtures/help/`, which is the only mechanical
-way a newly appeared flag becomes visible.
+way a newly appeared flag becomes visible; `--tools-diff` does the same for the tools a lane
+advertises to its model.
 
 ## Where facts live
 

@@ -1,0 +1,19 @@
+# what the codex lane advertises: npm run check-updates -- --tools-diff
+error activeTurnNotSteerable
+error badRequest
+error contextWindowExceeded
+error cyberPolicy
+error httpConnectionFailed
+error internalServerError
+error misalignmentPolicyViolation
+error other
+error rateLimitExceeded
+error responseStreamConnectionFailed
+error responseStreamDisconnected
+error responseTooManyFailedAttempts
+error sandboxError
+error serverOverloaded
+error sessionBudgetExceeded
+error threadRollbackFailed
+error unauthorized
+error usageLimitExceeded

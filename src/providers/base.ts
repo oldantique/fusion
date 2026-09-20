@@ -65,6 +65,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
         }
         const obj = tryJson(item.line);
         if (obj === undefined && item.line.trim()) plain.push(item.line);
+        if (obj !== undefined) opts.onRecord?.(obj);
         const events = obj !== undefined ? parser.feed(obj) : (spec.plainLine?.(item.line, parser) ?? []);
         for (const ev of events) {
           if (ev.type === "done") sawDone = true;

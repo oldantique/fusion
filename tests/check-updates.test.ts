@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { cmpVersion, extractVersion, verifiedVersions } from "../scripts/check-updates.ts";
+import { cmpVersion, codexErrorVariants, extractVersion, toolLines, verifiedVersions } from "../scripts/check-updates.ts";
 
 test("extractVersion pulls the number out of each CLI's --version line", () => {
   assert.equal(extractVersion("2.1.238 (Claude Code)"), "2.1.238");
@@ -38,4 +38,25 @@ test("every CLI has a verified version in the real fixtures/README.md", () => {
   const readme = fs.readFileSync(path.resolve(import.meta.dirname, "..", "fixtures", "README.md"), "utf8");
   const v = verifiedVersions(readme);
   for (const id of ["claude", "codex", "kimi", "grok"]) assert.ok(v.get(id), `no verified version recorded for ${id}`);
+});
+
+test("toolLines is one sorted line per name, and an MCP server is its name without its status", () => {
+  const text = toolLines({ tool: ["read_file", "grep"], mcp: [{ name: "claude.ai Docs", status: "pending" }] });
+  assert.equal(text, "mcp claude.ai Docs\ntool grep\ntool read_file\n");
+  assert.equal(toolLines({ tool: [], mcp: undefined }), "");
+});
+
+test("codexErrorVariants reads both the plain enum and the object variants", () => {
+  const schema = {
+    definitions: {
+      CodexErrorInfo: {
+        oneOf: [
+          { enum: ["usageLimitExceeded", "rateLimitExceeded"], type: "string" },
+          { type: "object", required: ["httpConnectionFailed"], properties: {} },
+        ],
+      },
+    },
+  };
+  assert.deepEqual(codexErrorVariants(schema), ["usageLimitExceeded", "rateLimitExceeded", "httpConnectionFailed"]);
+  assert.deepEqual(codexErrorVariants({}), []);
 });

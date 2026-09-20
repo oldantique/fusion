@@ -47,13 +47,16 @@ Then `npm run smoke`. If a lane fails, run the CLI by hand from `data/sandbox/` 
 `src/providers/index.ts` and compare its output to `fixtures/` (for codex the daemon protocol is
 in `src/providers/codex-app-server.ts` and `codex app-server generate-json-schema --out DIR`
 prints the schema the new build speaks; diff it against the fields that file reads, and look
-for new variants of the error enum). If the format changed: capture a new fixture, adjust the
+for new variants of the error enum — `--tools-diff` below lists them). If the format changed: capture a new fixture, adjust the
 parser, add a test. Either way the upgrade is not done until `fixtures/README.md` has a row for
 the installed build — `hooks/pre-commit` refuses lane-code commits until then.
 
-A passing smoke does not show a tool the new build added. Read the first line of a fresh claude
-and grok capture: its tool list and MCP-server list must contain nothing the lane's blocks in
-`src/providers/index.ts` do not name. `--help-diff` cannot see this; a new tool is not a new flag.
+A passing smoke does not show a tool the new build added, and neither does `--help-diff`: a new
+tool is not a new flag. `npm run check-updates -- --tools-diff` diffs what each lane advertises
+to its model (claude and grok: the tool and MCP-server lists of the init record, taken through
+the lane itself; codex: the error variants of its generated schema) against the
+`fixtures/help/*.tools.txt` baselines. Anything added must be named by the lane's blocks in
+`src/providers/index.ts`, or mapped in the codex error handler, before `--tools-diff --update`.
 
 ## Failure modes
 

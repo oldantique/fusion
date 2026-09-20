@@ -17,12 +17,20 @@
  * `fixtures/help/`. That diff is the only mechanical way to notice codex growing token deltas,
  * kimi growing an effort flag, or grok fixing `--disallowed-tools`.
  *
+ * `--help` is itself blind to what a CLI hands the *model*: a tool that appeared, an MCP server the
+ * account registered, a new error variant in codex's protocol. `--tools-diff` snapshots those —
+ * for claude and grok the `system` init record of the lane exactly as Fusion spawns it (the call
+ * is aborted as soon as that record arrives, before any answer is generated), for codex the
+ * `CodexErrorInfo` variants of its generated app-server schema. kimi prints no such list. It
+ * logs in and spawns jailed CLIs, so it is an on-demand step of an upgrade, never the hook's.
+ *
  * Usage: npm run check-updates                          the three-column table
  *        npm run check-updates -- --strict              exit 1 on installed > last-verified
  *        npm run check-updates -- --strict --offline    the same without the registry lookup — what
  *                                                       `hooks/pre-commit` runs
  *        npm run check-updates -- --help-diff           diff `--help` against the snapshots
  *        npm run check-updates -- --help-diff --update  rewrite the snapshots
+ *        npm run check-updates -- --tools-diff [--update]  the same for what each lane advertises
  * `--strict` turns either kind of drift into exit 1, so a hook or CI job can fail on it.
  *
  * There is deliberately no `--mark` and no git tag: `fixtures/README.md` is the single home for
@@ -32,7 +40,9 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../src/config.ts";
+import os from "node:os";
 import { childEnv } from "../src/providers/process.ts";
+import type { Provider } from "../src/types.ts";
 import { cliVersion } from "./doctor.ts";
 
 interface CliSpec {
@@ -197,39 +207,141 @@ function diffLines(a: string[], b: string[]): string[] {
   return out;
 }
 
-async function helpDiff(update: boolean): Promise<number> {
+/** Compare live snapshots with the committed ones; returns how many differ. */
+async function snapshotDiff(
+  items: { id: string; file: string; live: () => Promise<string | null>; unreadable: string }[],
+  update: boolean,
+  advice: string,
+): Promise<number> {
   fs.mkdirSync(HELP_DIR, { recursive: true });
   fs.mkdirSync(config.sandboxDir, { recursive: true });
   let changed = 0;
-  for (const cli of CLIS) {
-    const file = path.join(HELP_DIR, `${cli.id}.txt`);
-    const live = await helpSnapshot(cli);
+  for (const item of items) {
+    const live = await item.live();
     if (live === null) {
-      console.log(`${cli.id.padEnd(8)} ${warn("could not read --help (not installed, or it timed out)")}`);
+      console.log(`${item.id.padEnd(8)} ${warn(item.unreadable)}`);
       continue;
     }
-    if (!fs.existsSync(file)) {
-      fs.writeFileSync(file, live);
-      console.log(`${cli.id.padEnd(8)} snapshot created (${path.relative(ROOT, file)})`);
+    if (!fs.existsSync(item.file)) {
+      fs.writeFileSync(item.file, live);
+      console.log(`${item.id.padEnd(8)} snapshot created (${path.relative(ROOT, item.file)})`);
       continue;
     }
-    const d = diffLines(fs.readFileSync(file, "utf8").split("\n"), live.split("\n"));
+    const d = diffLines(fs.readFileSync(item.file, "utf8").split("\n"), live.split("\n"));
     if (d.length === 0) {
-      console.log(`${cli.id.padEnd(8)} ${dim("unchanged")}`);
+      console.log(`${item.id.padEnd(8)} ${dim("unchanged")}`);
       continue;
     }
     changed++;
-    console.log(`${cli.id.padEnd(8)} ${warn(`CHANGED (${d.length} lines; + added, - removed)`)}`);
+    console.log(`${item.id.padEnd(8)} ${warn(`CHANGED (${d.length} lines; + added, - removed)`)}`);
     for (const line of d) console.log(`    ${line}`);
     if (update) {
-      fs.writeFileSync(file, live);
-      console.log(`    ${dim(`snapshot updated: ${path.relative(ROOT, file)}`)}`);
+      fs.writeFileSync(item.file, live);
+      console.log(`    ${dim(`snapshot updated: ${path.relative(ROOT, item.file)}`)}`);
     }
   }
-  if (changed && !update) {
-    console.log(`\nA new flag can invalidate a CLAUDE.md gotcha. Re-verify what changed, then rerun with --update.`);
-  }
+  if (changed && !update) console.log(`\n${advice}`);
   return changed;
+}
+
+function helpDiff(update: boolean): Promise<number> {
+  return snapshotDiff(
+    CLIS.map((cli) => ({
+      id: cli.id,
+      file: path.join(HELP_DIR, `${cli.id}.txt`),
+      live: () => helpSnapshot(cli),
+      unreadable: "could not read --help (not installed, or it timed out)",
+    })),
+    update,
+    "A new flag can invalidate a CLAUDE.md gotcha. Re-verify what changed, then rerun with --update.",
+  );
+}
+
+// --- advertised tools --------------------------------------------------------------------
+
+/** One sorted `kind name` line per entry, so a snapshot diff is a list of names. */
+export function toolLines(entries: Record<string, unknown>): string {
+  const lines: string[] = [];
+  for (const [kind, list] of Object.entries(entries)) {
+    if (!Array.isArray(list)) continue;
+    // claude lists MCP servers as {name, status}; the status moves on its own, the name is the fact.
+    for (const v of list) lines.push(`${kind} ${typeof v === "string" ? v : String((v as { name?: unknown })?.name)}`);
+  }
+  return lines.sort().map((l) => `${l}\n`).join("");
+}
+
+/** The lane's `system` init record, taken through the provider itself so flags and jail apply. */
+async function initRecord(provider: Provider): Promise<string | null> {
+  const ac = new AbortController();
+  let init: Record<string, unknown> | undefined;
+  const timer = setTimeout(() => ac.abort(), 60_000);
+  const onRecord = (r: unknown) => {
+    const rec = r as Record<string, unknown> | null;
+    if (init || rec?.type !== "system" || !Array.isArray(rec.tools)) return;
+    init = rec;
+    ac.abort(); // the list is all we came for; no answer needs to be paid for
+  };
+  try {
+    for await (const _ of provider.call({ system: "", prompt: "Reply with: ok", signal: ac.signal, onRecord })) void _;
+  } finally {
+    clearTimeout(timer);
+  }
+  return init ? toolLines({ tool: init.tools, mcp: init.mcp_servers }) : null;
+}
+
+/** Variant names of `CodexErrorInfo` in the schema the installed codex generates (no model call). */
+export function codexErrorVariants(schema: any): string[] {
+  const out: string[] = [];
+  for (const v of schema?.definitions?.CodexErrorInfo?.oneOf ?? []) {
+    if (Array.isArray(v.enum)) out.push(...v.enum);
+    else if (Array.isArray(v.required)) out.push(...v.required);
+  }
+  return out;
+}
+
+function codexErrors(): Promise<string | null> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fusion-codex-schema-"));
+  return new Promise((resolve) => {
+    const child = spawn("codex", ["app-server", "generate-json-schema", "--out", dir], { cwd: config.sandboxDir, env: childEnv(), stdio: "ignore" });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 60_000);
+    const done = (text: string | null) => {
+      clearTimeout(timer);
+      fs.rmSync(dir, { recursive: true, force: true });
+      resolve(text);
+    };
+    child.on("error", () => done(null));
+    child.on("close", () => {
+      try {
+        const schema = JSON.parse(fs.readFileSync(path.join(dir, "codex_app_server_protocol.v2.schemas.json"), "utf8"));
+        const variants = codexErrorVariants(schema);
+        done(variants.length ? toolLines({ error: variants }) : null);
+      } catch {
+        done(null);
+      }
+    });
+  });
+}
+
+async function toolsDiff(update: boolean): Promise<number> {
+  // Imported here: loading the providers reads the whole configuration, which the table does not need.
+  const { claude, grok } = await import("../src/providers/index.ts");
+  const file = (id: string) => path.join(HELP_DIR, `${id}.tools.txt`);
+  const unreadable = "no init record (not installed, not logged in, or it timed out)";
+  // A lane that advertises nothing is the best case; the header keeps that file from being empty.
+  const titled = (id: string, live: () => Promise<string | null>) => async () => {
+    const text = await live();
+    return text === null ? null : `# what the ${id} lane advertises: npm run check-updates -- --tools-diff\n${text}`;
+  };
+  console.log(`${"kimi".padEnd(8)} ${dim("prints no tool list; its agent file is the control")}`);
+  return snapshotDiff(
+    [
+      { id: "claude", file: file("claude"), live: titled("claude", () => initRecord(claude)), unreadable },
+      { id: "codex", file: file("codex"), live: titled("codex", codexErrors), unreadable: "could not generate the app-server schema" },
+      { id: "grok", file: file("grok"), live: titled("grok", () => initRecord(grok)), unreadable },
+    ],
+    update,
+    "A lane now advertises something it did not. Decide whether a flag must remove it (src/providers/index.ts), then rerun with --update.",
+  );
 }
 
 // --- table -------------------------------------------------------------------------------
@@ -288,6 +400,7 @@ async function table(offline: boolean): Promise<number> {
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2);
   const strict = args.includes("--strict");
-  const problems = args.includes("--help-diff") ? await helpDiff(args.includes("--update")) : await table(args.includes("--offline"));
+  const update = args.includes("--update");
+  const problems = args.includes("--tools-diff") ? await toolsDiff(update) : args.includes("--help-diff") ? await helpDiff(update) : await table(args.includes("--offline"));
   process.exit(strict && problems ? 1 : 0);
 }

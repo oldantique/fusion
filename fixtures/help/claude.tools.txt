@@ -1,0 +1,1 @@
+# what the claude lane advertises: npm run check-updates -- --tools-diff
