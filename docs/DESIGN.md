@@ -411,3 +411,19 @@ no message while the reason (a refused wording, a quota) is only on stderr, so t
 held until the process exits, the stderr tail is attached and takes part in rate-limit
 classification, and the lane's own timeout or abort verdict outranks whatever the CLI printed
 while being killed — a timed-out lane is no longer retried as an ordinary exit.
+
+
+## 2026-09-23 — The claude lane names a pinned model, not the `opus` alias
+
+The claude lane asked for `opus` since the first commit, and `KNOWN_MODELS` named that alias
+"Claude Opus 5". When Opus 5.5 shipped, the claude CLI moved the alias to it: the lane would have
+answered with Opus 5.5 under Opus 5's name and cutoff, with nothing in the stream to catch it,
+because the snapshot records the id we asked for, not the one the vendor resolved. The default
+is now the pinned `claude-opus-5-5`, and a `KNOWN_MODELS` row is keyed by a pinned id only — a
+model change becomes a visible edit instead of a silent vendor move. The alias row is gone rather
+than relabelled: an `.env` that still says `opus` is shown as `opus`, which is true whatever it
+resolves to; turns already stored keep the label they were saved with. A pinned id can need a
+newer CLI (this one did — `fixtures/README.md`), so a model bump rides on a verified build.
+The grok lane moved from `grok-4.6` to `grok-4.7` in the same pass; codex and kimi already name
+pinned ids.
+

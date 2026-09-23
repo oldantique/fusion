@@ -9,20 +9,25 @@ export const ALL_PROVIDERS: readonly ProviderId[] = ["claude", "codex", "kimi", 
  * knowledge cutoff (the lanes run offline, so that is the edge of what they know). Keyed by model,
  * not by provider: a lane whose model is changed in `.env` must not inherit the default's name.
  * Home of these facts; cutoffs verified against the vendors' model pages (2026-08-21, codex
- * 2026-09-20) — add a row when a model in `.env` changes:
+ * 2026-09-20, claude and grok 2026-09-23) — add a row when a model in `.env` changes. Key a row by
+ * a pinned id, never an alias: the vendor moves an alias (claude's "opus" went from Opus 5 to 5.5)
+ * and the row would go on naming the old model:
  *   claude → platform.claude.com/docs/en/about-claude/models/overview
  *   codex  → developers.openai.com/api/docs/models/<id>
- *   grok   → docs.x.ai/developers/grok-4-6
+ *   grok   → docs.x.ai/developers/grok-4-7
  *   kimi   → K3: no cutoff published (model card, docs and tech report checked) — `null`.
  */
 const KNOWN_MODELS: Record<ProviderId, Record<string, { label: string; cutoff: string | null }>> = {
-  claude: { opus: { label: "Claude Opus 5", cutoff: "2026-05" } },
+  claude: { "claude-opus-5-5": { label: "Claude Opus 5.5", cutoff: "2026-06" } },
   codex: {
     "gpt-6-astra": { label: "GPT-6 Astra", cutoff: "2026-04" },
     "gpt-5.6-sol": { label: "GPT-5.6 Sol", cutoff: "2026-02" },
   },
   kimi: { "kimi-code/k3": { label: "Kimi K3", cutoff: null } },
-  grok: { "grok-4.6": { label: "Grok 4.6", cutoff: "2026-02" } },
+  grok: {
+    "grok-4.7": { label: "Grok 4.7", cutoff: "2026-05" },
+    "grok-4.6": { label: "Grok 4.6", cutoff: "2026-02" },
+  },
 };
 
 export interface ModelInfo {

@@ -104,10 +104,10 @@ export const config = {
   historyCharBudget: int("HISTORY_CHAR_BUDGET", 60_000, 1_000),
 
   models: {
-    claude: process.env.CLAUDE_MODEL ?? "opus",
+    claude: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
     codex: process.env.CODEX_MODEL ?? "gpt-6-astra",
     kimi: process.env.KIMI_MODEL ?? "kimi-code/k3",
-    grok: process.env.GROK_MODEL ?? "grok-4.6",
+    grok: process.env.GROK_MODEL ?? "grok-4.7",
   },
   effort: PANEL_EFFORT,
   /**

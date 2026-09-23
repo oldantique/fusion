@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The claude lane runs Claude Opus 5.5 (`claude-opus-5-5`, pinned rather than the moving `opus`
+  alias; needs claude 2.1.280 or newer) and the grok lane Grok 4.7. History keeps the names it
+  was saved with.
 - A fresh clone no longer fails its first lane call with a misleading "spawn … ENOENT": the
   empty sandbox directory the CLIs run in is created on demand, not only by the server.
 - `npm run check-updates -- --tools-diff`: baselines of what each lane advertises to its model —
