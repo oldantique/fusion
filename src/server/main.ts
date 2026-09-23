@@ -4,6 +4,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { etag } from "hono/etag";
 import { streamSSE } from "hono/streaming";
 import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
 import { Store } from "../store/db.ts";
@@ -156,7 +157,17 @@ app.get("/api/turns/:id/events", (c) => {
 });
 
 // ---- static UI (web/vendor/bundle.js is produced by `npm run build:vendor`) ----
-app.use("/*", serveStatic({ root: path.relative(process.cwd(), config.webDir) }));
+// The files keep their names across releases, so a cache in front (the browser, or a CDN proxy
+// that gives script files a TTL when the origin names none) can go on serving the old app.js
+// against the new API. `no-cache` makes every load revalidate; the ETag keeps that a 304.
+app.use("/*", etag());
+app.use(
+  "/*",
+  serveStatic({
+    root: path.relative(process.cwd(), config.webDir),
+    onFound: (_path, c) => c.header("Cache-Control", "no-cache"),
+  }),
+);
 
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
   console.log(`fusion listening on http://${info.address}:${info.port}`);

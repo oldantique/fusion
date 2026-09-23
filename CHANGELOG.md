@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The UI's files are served with `Cache-Control: no-cache` and an ETag, so a browser or a proxy
+  in front revalidates them on every load instead of running an old `app.js` against the new
+  server — which is how history could still show today's model names after that was fixed.
 - The claude lane runs Claude Opus 5.5 (`claude-opus-5-5`, pinned rather than the moving `opus`
   alias; needs claude 2.1.280 or newer) and the grok lane Grok 4.7. History keeps the names it
   was saved with.
