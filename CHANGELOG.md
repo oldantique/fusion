@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The comparison under a fused answer is written in the question's language like the answer
+  (Claude Opus 5.5 had started writing it in English), and a unique insight names its model even
+  when the synthesizer writes "candidate C" instead of the bare letter.
 - The UI's files are served with `Cache-Control: no-cache` and an ETag, so a browser or a proxy
   in front revalidates them on every load instead of running an old `app.js` against a newer
   server after an update.

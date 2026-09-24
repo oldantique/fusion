@@ -407,7 +407,12 @@ function paintLaneResult(lane, r) {
 
 function paintAnalysis(view, analysis, letterMap) {
   if (!analysis) return;
-  const name = (letter) => letterMap?.[letter] ? view.name(letterMap[letter]) : letter;
+  // A unique insight's `answer` is a bare letter by the schema, but a synthesizer whose schema is
+  // enforced only by the prompt (or a turn saved before the enum) can write "candidate C".
+  const name = (raw) => {
+    const letter = /^\s*(?:candidates?|候选)?\s*([A-H])\s*$/i.exec(raw)?.[1]?.toUpperCase() ?? raw;
+    return letterMap?.[letter] ? view.name(letterMap[letter]) : raw;
+  };
   const section = (title, items, fmt = (s) => s) => {
     if (!items?.length) return "";
     return `<h4>${title}</h4><ul>${items.map((i) => `<li>${fmt(i)}</li>`).join("")}</ul>`;
@@ -423,7 +428,7 @@ function paintAnalysis(view, analysis, letterMap) {
   view.analysisBody.innerHTML =
     section("Consensus", analysis.consensus, deanon) +
     section("Contradictions", analysis.contradictions, deanon) +
-    section("Unique insights", analysis.unique_insights, (u) => `<span class="letter">${esc(name(u.answer))}</span>: ${esc(u.point)}`) +
+    section("Unique insights", analysis.unique_insights, (u) => `<span class="letter">${esc(name(u.answer))}</span>: ${deanon(u.point)}`) +
     section("Gaps in all answers", analysis.gaps, deanon);
   view.analysis.classList.toggle("hidden", view.analysisBody.innerHTML === "");
   if (letterMap) {
