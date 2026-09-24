@@ -74,8 +74,9 @@ and codex error variants that appeared), `test`, `typecheck`, `check-docs`, `dev
 - **Never pass `--bare` to claude** — it disables OAuth and would demand an API key. Anthropic
   says it will become the `-p` default; see THREADS #17 before every claude upgrade.
 - **claude's `--tools ""` does not cover MCP**: the account's claude.ai connectors are registered
-  in the mounted `~/.claude.json` and appear in the lane as pending servers; `--strict-mcp-config`
-  (with no config given) is what keeps that channel closed. Do not drop it.
+  in the mounted `~/.claude.json`, and without `--strict-mcp-config` they *connect* in the lane
+  and hand the model their tools (seen with a writable docs connector). That flag (with no config
+  given) is the only thing keeping them out. Do not drop it.
 - **A CLI can inject an account-level output language** that wins over the question's language:
   claude does it for an account whose preference is set (observed with Chinese) and no flag
   disables it. Only the emphatic language line in `src/synth/prompts.ts` overrides it — verified
@@ -111,11 +112,17 @@ and codex error variants that appeared), `test`, `typecheck`, `check-docs`, `dev
   but has no working IPv6 egress, every call fails with an OAuth "fetch failed"
   without it (an interactive shell usually gets the same option from `.bashrc`, which is why the
   failure shows up only under the service).
-- The two CLIs with `--json-schema` stream it differently: claude sends the document as
-  `input_json_delta` fragments, grok as ordinary `text_delta`s. Both end with the parsed object on
-  `result.structured_output`, and `src/parsers/json-field-stream.ts` streams one field of it
-  either way. grok's schema is enforced by the prompt rather than the decoder, so the object can
-  fail to arrive — `structuredOutput()` in `src/parsers/anthropic-stream.ts` degrades instead.
+- The two CLIs with `--json-schema` stream it differently: claude makes the document a tool call
+  (`input_json_delta` fragments) *beside* its reply text, grok makes it the reply text itself
+  (`text_delta`s). Both end with the parsed object on `result.structured_output`. So claude's
+  synthesizer answers in its reply and the schema holds only the analysis (`proseBesideSchema`,
+  `synthSystem("prose")`): asked for both, Opus 5.5 wrote the answer twice and once left a "see
+  above" pointer in the schema's copy. `src/parsers/json-field-stream.ts` streams grok's `answer`
+  field; grok's schema is enforced by the prompt rather than the decoder, so the object can fail
+  to arrive — `structuredOutput()` in `src/parsers/anthropic-stream.ts` degrades instead.
+- A turn that went wrong is read from its **traces**: `data/traces/<turn-id>/` holds the raw
+  output of every lane and synthesizer attempt, with its input and outcome
+  (`src/store/traces.ts`). The lanes themselves keep no session files.
 - Only *fused* answers are replayed as conversation history, never raw lane answers — except
   that a turn whose answer *is* one lane's answer (single lane, or every synthesizer failed) is
   replayed like any other turn. Changing that changes the product.

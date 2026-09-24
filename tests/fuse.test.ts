@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { fuse, type FuseEvent } from "../src/synth/fuse.ts";
 import { runLane } from "../src/providers/lane.ts";
 import type { CallOptions, LaneEvent, Provider, ProviderId } from "../src/types.ts";
+import { ANALYSIS_SCHEMA, SYNTH_SCHEMA } from "../src/synth/prompts.ts";
+import type { Tracer } from "../src/store/traces.ts";
 
 type Script = (opts: CallOptions) => LaneEvent[];
 function stub(id: ProviderId, script: Script, supportsJsonSchema = false): Provider {
@@ -88,6 +90,70 @@ test("claude synthesizes with structured analysis when it works", async () => {
   assert.equal(out.answerProvider, null);
   const starts = events.filter((e) => e.type === "synth" && e.status === "start");
   assert.equal(starts.length, 1);
+});
+
+test("a prose-beside-schema synthesizer answers in its reply and gets the analysis-only schema", async () => {
+  const seen: CallOptions[] = [];
+  const claude: Provider = {
+    ...stub("claude", (o) => {
+      if (!o.prompt.includes("<candidate")) return [{ type: "done", text: "c" }];
+      seen.push(o);
+      return [{ type: "delta", text: "prose " }, { type: "done", text: "prose answer", structured: { analysis: { consensus: ["x"], contradictions: [], unique_insights: [], gaps: [] } } }];
+    }, true),
+    proseBesideSchema: true,
+  };
+  const { out, events } = await run({ claude, grok: stub("grok", ok("g")) }, ["claude", "grok"]);
+  assert.equal(out.answer, "prose answer");
+  assert.deepEqual(out.synthesis?.analysis?.consensus, ["x"]);
+  assert.equal(seen[0]!.jsonSchema, ANALYSIS_SCHEMA);
+  assert.equal(seen[0]!.streamField, undefined);
+  assert.match(seen[0]!.system, /reply text/);
+  assert.ok(events.some((e) => e.type === "synth" && e.status === "delta" && e.text === "prose "), "the prose streams as the answer");
+});
+
+test("an empty reply from a prose synthesizer moves the chain on; grok still gets the full schema", async () => {
+  const claude: Provider = {
+    ...stub("claude", synthOrPanel("c", [{ type: "done", text: "", structured: { analysis: { consensus: [], contradictions: [], unique_insights: [], gaps: [] } } }]), true),
+    proseBesideSchema: true,
+  };
+  let grokOpts: CallOptions | undefined;
+  const grok = stub("grok", (o) => {
+    if (!o.prompt.includes("<candidate")) return [{ type: "done", text: "g" }];
+    grokOpts = o;
+    return [{ type: "done", text: "grok-fused", structured: { answer: "grok-fused", analysis: { consensus: ["y"], contradictions: [], unique_insights: [], gaps: [] } } }];
+  }, true);
+  const { out } = await run({ claude, grok }, ["claude", "grok"]);
+  assert.equal(out.synthesis?.provider, "grok");
+  assert.equal(out.answer, "grok-fused");
+  assert.equal(grokOpts!.jsonSchema, SYNTH_SCHEMA);
+  assert.equal(grokOpts!.streamField, "answer");
+});
+
+test("the trace hook sees each call's input and records, and one end per lane and synth attempt", async () => {
+  const traced: Record<string, { records: unknown[]; ended: unknown[] }> = {};
+  const trace = (name: string): Tracer => {
+    const t = (traced[name] = { records: [] as unknown[], ended: [] as unknown[] });
+    return { record: (o) => t.records.push(o), end: async (r) => void t.ended.push(r) };
+  };
+  const recording = (id: ProviderId, text: string): Provider => ({
+    ...stub(id, ok(text)),
+    async *call(opts) {
+      opts.onRecord?.({ type: "raw", id });
+      yield { type: "done", text };
+    },
+  });
+  const events: FuseEvent[] = [];
+  await fuse(
+    { question: "q?", history: [], providerIds: ["claude", "grok"], onEvent: (e) => events.push(e), trace },
+    { providers: { claude: recording("claude", "c"), grok: recording("grok", "g") }, runLane, staggerMs: 0 },
+  );
+  assert.deepEqual(Object.keys(traced).sort(), ["lane-claude", "lane-grok", "synth-1-claude"]);
+  for (const t of Object.values(traced)) {
+    assert.equal((t.records[0] as any).type, "fusion/input");
+    assert.deepEqual(t.records[1], { type: "raw", id: (t.records[1] as any).id });
+    assert.equal(t.ended.length, 1);
+  }
+  assert.match((traced["synth-1-claude"]!.records[0] as any).prompt, /<candidate/);
 });
 
 test("falls back to the next synthesizer when claude fails, in the documented order", async () => {

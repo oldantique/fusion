@@ -24,6 +24,7 @@ export const claude: Provider = cliProvider({
   label: modelInfo("claude", config.models.claude).label,
   streams: true,
   supportsJsonSchema: true,
+  proseBesideSchema: true,
   // Writable: the OAuth refresh rewrites .credentials.json and the CLI updates .claude.json.
   mounts: { rw: ["~/.claude", "~/.claude.json"] },
   build(opts) {
@@ -42,8 +43,8 @@ export const claude: Provider = cliProvider({
       "--setting-sources",
       "",
       // `--tools ""` only governs built-in tools. The account's claude.ai connectors are MCP
-      // servers registered in ~/.claude.json (mounted for OAuth) and show up in the lane as
-      // "pending"; nothing connects them today, but only this flag makes that structural.
+      // servers registered in ~/.claude.json (mounted for OAuth); without this flag they connect
+      // in the lane and offer the model their tools, writable ones included.
       "--strict-mcp-config",
       "--disable-slash-commands",
       "--no-session-persistence",

@@ -7,7 +7,8 @@ import { config } from "../config.ts";
 import { providers as realProviders } from "../providers/index.ts";
 import { runLane as realRunLane, sleep } from "../providers/lane.ts";
 import type { Analysis, HistoryTurn, LaneResult, Provider, ProviderId, SynthesisResult } from "../types.ts";
-import { PANEL_SYSTEM, SYNTH_SCHEMA, SYNTH_SYSTEM, panelPrompt, renderHistory, synthPrompt } from "./prompts.ts";
+import type { TraceOpener } from "../store/traces.ts";
+import { ANALYSIS_SCHEMA, PANEL_SYSTEM, SYNTH_SCHEMA, panelPrompt, renderHistory, synthPrompt, synthSystem } from "./prompts.ts";
 
 export type FuseEvent =
   | { type: "lane"; provider: ProviderId; status: "queued" | "running"; attempt: number; at: number }
@@ -29,6 +30,8 @@ export interface FuseInput {
   providerIds: ProviderId[];
   signal?: AbortSignal;
   onEvent: (ev: FuseEvent) => void;
+  /** Raw-output tracing (`src/store/traces.ts`); absent in tests and scripts. */
+  trace?: TraceOpener;
 }
 
 export interface FuseOutput {
@@ -86,10 +89,12 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
     ids.map(async (id, i) => {
       if (i > 0 && stagger > 0) await sleep(i * stagger, signal);
       // An abort during the wait is not special-cased: runLane turns it into a failed lane.
-      const result = await runLane(providers[id]!, { prompt, system: PANEL_SYSTEM, signal }, (ev) => {
+      const tracer = openTrace(input.trace, `lane-${id}`, PANEL_SYSTEM, prompt);
+      const result = await runLane(providers[id]!, { prompt, system: PANEL_SYSTEM, signal, onRecord: tracer?.record }, (ev) => {
         if (ev.type === "status") onEvent({ type: "lane", provider: id, status: ev.status, attempt: ev.attempt, at: ev.at });
         else if (ev.type === "delta") onEvent({ type: "lane", provider: id, status: "delta", text: ev.text });
       });
+      void tracer?.end(result);
       onEvent({ type: "lane", provider: id, status: result.status === "done" ? "done" : "failed", result });
       return result;
     }),
@@ -112,7 +117,7 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
     return { ...base, synthesis: null, answer: done[0]!.answer, answerProvider: done[0]!.provider };
   }
 
-  const synthesis = await synthesize(question, rendered, lanes, signal, onEvent, deps);
+  const synthesis = await synthesize(question, rendered, lanes, signal, onEvent, deps, input.trace);
   if (synthesis) return { ...base, synthesis, answer: synthesis.answer, answerProvider: null };
 
   // Every synthesizer failed (or the chain was aborted/deadlined): show the best raw answer rather
@@ -130,6 +135,7 @@ async function synthesize(
   signal: AbortSignal | undefined,
   onEvent: (ev: FuseEvent) => void,
   deps: FuseDeps,
+  trace?: TraceOpener,
 ): Promise<SynthesisResult | null> {
   const { prompt, letterMap } = synthPrompt(question, rendered, lanes);
   const effort = deps.synthEffort ?? config.synthEffort;
@@ -142,6 +148,7 @@ async function synthesize(
   const cap = AbortSignal.timeout(3 * timeoutMs);
   const chainSignal = signal ? AbortSignal.any([signal, cap]) : cap;
   let previous: ProviderId | null = null;
+  let attemptNo = 0;
   for (const id of SYNTH_CHAIN) {
     const provider = deps.providers[id];
     if (!provider) continue;
@@ -149,20 +156,29 @@ async function synthesize(
     onEvent({ type: "synth", status: "start", provider: id, fallback: previous !== null && previous !== id, retry: previous === id });
     const attemptSignal = AbortSignal.any([chainSignal, AbortSignal.timeout(timeoutMs)]);
     const started = Date.now();
-    const structured = provider.supportsJsonSchema;
     let lastStructured: unknown;
+    // A synthesizer that writes prose beside its schema answers in the prose (the lane's own
+    // text, streamed as usual) and puts only the analysis in the schema; an empty reply is an
+    // "empty" failure and the chain moves on.
+    const style = provider.proseBesideSchema ? "prose" : provider.supportsJsonSchema ? "json" : "plain";
+    const system = synthSystem(style);
+    const tracer = openTrace(trace, `synth-${++attemptNo}-${id}`, system, prompt);
+    const common = { prompt, system, signal: attemptSignal, attempts: 1, effort, onRecord: tracer?.record };
     const result = await deps.runLane(
       provider,
-      structured
-        ? { prompt, system: SYNTH_SYSTEM, jsonSchema: SYNTH_SCHEMA, streamField: "answer", signal: attemptSignal, attempts: 1, effort }
-        : { prompt: `${prompt}\n\nWrite only the final merged Markdown answer.`, system: SYNTH_SYSTEM, signal: attemptSignal, attempts: 1, effort },
+      style === "prose"
+        ? { ...common, jsonSchema: ANALYSIS_SCHEMA }
+        : style === "json"
+          ? { ...common, jsonSchema: SYNTH_SCHEMA, streamField: "answer" }
+          : common,
       (ev) => {
         if (ev.type === "delta") onEvent({ type: "synth", status: "delta", text: ev.text });
         if (ev.type === "done" && ev.structured) lastStructured = ev.structured;
       },
     );
+    void tracer?.end(result);
     if (result.status === "done" && result.answer) {
-      const analysis = structured ? coerceAnalysis((lastStructured as any)?.analysis) : null;
+      const analysis = style !== "plain" ? coerceAnalysis((lastStructured as any)?.analysis) : null;
       const out: SynthesisResult = { analysis, answer: result.answer, provider: id, ms: Date.now() - started, letterMap };
       onEvent({ type: "synth", status: "done", result: out });
       return out;
@@ -171,6 +187,13 @@ async function synthesize(
     previous = id;
   }
   return null;
+}
+
+/** Opens a trace and records what the call was given, so a bad turn can be replayed exactly. */
+function openTrace(trace: TraceOpener | undefined, name: string, system: string, prompt: string) {
+  const tracer = trace?.(name);
+  tracer?.record({ type: "fusion/input", system, prompt });
+  return tracer;
 }
 
 function coerceAnalysis(a: any): Analysis | null {

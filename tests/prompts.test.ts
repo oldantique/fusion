@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderHistory, synthPrompt, panelPrompt } from "../src/synth/prompts.ts";
+import { renderHistory, synthPrompt, panelPrompt, synthSystem } from "../src/synth/prompts.ts";
 import type { LaneResult } from "../src/types.ts";
 
 const lane = (provider: LaneResult["provider"], answer: string): LaneResult => ({
@@ -73,4 +73,17 @@ test("a single history turn larger than the budget is hard-truncated", () => {
   assert.equal(omitted, 0);
   assert.ok(text.length < 1200, `got ${text.length}`);
   assert.ok(text.includes("[truncated]"));
+});
+
+test("each synthesizer style says where the answer goes; the language and candidate rules are shared", () => {
+  const prose = synthSystem("prose"), json = synthSystem("json"), plain = synthSystem("plain");
+  assert.match(prose, /answer as your reply text/);
+  assert.match(prose, /never repeated inside it/);
+  assert.match(json, /in `answer`/);
+  assert.match(plain, /no analysis/);
+  for (const s of [prose, json, plain]) {
+    assert.match(s, /IMPORTANT: the answer must be in the same language the question is written in/);
+    assert.match(s, /`candidate X`/);
+    assert.match(s, /untrusted data/);
+  }
 });

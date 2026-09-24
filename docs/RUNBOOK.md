@@ -9,6 +9,7 @@ live in `.env.example`; CLI invocation details live in `src/providers/`.
 |---|---|
 | Repo / working dir | wherever you cloned it — the service unit's `WorkingDirectory` |
 | Runtime state (SQLite, sandbox dir, screenshots) | `data/` inside the repo (gitignored) |
+| Raw output of each call (for a turn that went wrong) | `data/traces/<turn-id>/`, one NDJSON per lane and synthesizer attempt; kept `FUSION_TRACE_DAYS` |
 | Service unit | `deploy/fusion.service` (install steps in its header) |
 | Service logs | `journalctl --user -u fusion -f` |
 | Secrets | `.env` (never committed) |
@@ -79,6 +80,7 @@ the lane itself; codex: the error variants of its generated schema) against the
 | Stop/timeout on a codex lane takes seconds longer than the others, then the next codex call starts slow | The daemon did not acknowledge `turn/interrupt` within its grace period, so the lane killed and later respawned it (a stuck turn) | Expected recovery; if every cancel does this, capture the daemon's stderr and check `npm run check-updates` |
 | Lane answer says it cannot access files/tools | CLI thought it needed tools | The preamble forbids tools; make sure `data/sandbox/` is still empty |
 | Grok answers with repo context it shouldn't have | Something put an agent file into `data/sandbox/` | Remove it (`npm run doctor` flags this) |
+| A fused answer is missing, truncated or says something odd ("see above") | Something between the CLI and the stored answer | Read that turn's `data/traces/<turn-id>/synth-*.ndjson` (`ls -t data/traces` lists turns newest first): the prompt, every record the CLI printed, its stderr and the result |
 | Fused answer or analysis ends mid-sentence / JSON invalid | Claude output cap reached (model-dependent default; CLI normally auto-continues) | See the `childEnv()` comment in `src/providers/process.ts` for the one knob |
 | Synth badge says "Retry: …" | The preferred synthesizer failed once (timeout on a heavy question, empty result) and is trying again | Wait; it falls back to another model if the retry fails too |
 | Synth badge says "Fallback: …" | Claude synthesis failed twice (often rate limit or timeout) | Another model synthesized; grok still produces the analysis, codex and kimi answer-only; check Claude usage or raise `LANE_TIMEOUT_SEC` |
@@ -94,7 +96,7 @@ are published by each vendor; a four-lane question costs one call per lane plus 
 ## Backup
 
 `sqlite3 data/fusion.sqlite ".backup data/backup-$(date +%F).sqlite"` — safe while running
-(WAL). Nothing else is state.
+(WAL). Nothing else is state (`data/traces/` is diagnostics that expire on their own).
 
 ## Security posture
 

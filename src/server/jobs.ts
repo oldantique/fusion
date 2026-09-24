@@ -7,6 +7,7 @@
 import type { FuseEvent, FuseInput, FuseOutput } from "../synth/fuse.ts";
 import { fuse as realFuse } from "../synth/fuse.ts";
 import type { Store } from "../store/db.ts";
+import type { Traces } from "../store/traces.ts";
 import { ALL_PROVIDERS, modelInfo, type ModelSnapshot, type ProviderId } from "../types.ts";
 import { config } from "../config.ts";
 
@@ -57,9 +58,16 @@ export class Jobs {
   private readonly fuse: (input: FuseInput) => Promise<FuseOutput>;
 
   private models: () => ModelSnapshot;
+  private readonly traces: Traces | undefined;
 
-  constructor(store: Store, fuseImpl: (input: FuseInput) => Promise<FuseOutput> = realFuse, models: () => ModelSnapshot = configuredModels) {
+  constructor(
+    store: Store,
+    fuseImpl: (input: FuseInput) => Promise<FuseOutput> = realFuse,
+    models: () => ModelSnapshot = configuredModels,
+    traces?: Traces,
+  ) {
     this.store = store;
+    this.traces = traces;
     this.fuse = fuseImpl;
     this.models = models;
   }
@@ -108,6 +116,7 @@ export class Jobs {
       history,
       providerIds,
       signal: job.abort.signal,
+      trace: this.traces?.forTurn(turn.id),
       onEvent: (ev) => {
         if (ev.type === "lane" && (ev.status === "done" || ev.status === "failed")) {
           try {

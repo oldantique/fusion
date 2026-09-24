@@ -427,3 +427,34 @@ newer CLI (this one did — `fixtures/README.md`), so a model bump rides on a ve
 The grok lane moved from `grok-4.6` to `grok-4.7` in the same pass; codex and kimi already name
 pinned ids.
 
+
+## 2026-09-24 — claude synthesizes in prose; every call leaves a raw trace
+
+With Opus 5.5 the synthesizer changed shape under `--json-schema`: after thinking it writes the
+whole answer as reply text, then calls the schema tool with the answer repeated in `answer`
+(Opus 5 went straight to the tool). Fusion read only the tool's copy, so the answer was
+generated twice, nothing streamed while the first copy was written, and once — a long third turn
+— the tool's copy was just "see the full answer above", which became the stored answer while the
+real one was discarded. A prompt telling it to write nothing outside the schema did not change
+the behaviour in any trial. Taking the reply text as the answer and giving the schema only the
+analysis did work in every trial, with roughly half the output tokens, a noticeably shorter
+synthesis, and the answer streaming from its first word — so that is how claude synthesizes now.
+grok keeps the full schema: its structured output *is* its reply text, so there is no second
+channel to use. Heuristics that would spot a pointer in `answer` and swap in the prose were
+considered and dropped: with the answer taken from the prose there is no copy left to go wrong,
+and a reply with no prose is an ordinary empty result that the fallback chain already handles.
+
+The lost answer could not be recovered because no raw output was kept (the lanes run with
+`--no-session-persistence`). Rather than turning claude's session files back on — one CLI only,
+in its own directory layout, outside Fusion's retention — every lane and synthesizer attempt now
+writes one NDJSON trace under `data/traces/<turn-id>/`: the prompt it was given, every record
+the CLI printed, its exit and stderr, and the lane result. Traces are written once when a call
+ends, capped per file, removed with their conversation, and pruned after `FUSION_TRACE_DAYS`.
+
+The re-verification of a new claude build in the same pass found the 2026-09-20 premise moved: without
+`--strict-mcp-config` the account's connector no longer sits pending but connects in the lane and
+offers the model its tools, a writable one among them, despite `--tools ""`. The previous build
+does the same today, so the change is on the account side, not in the CLI. The flag was already
+there and still leaves the lane with no MCP server; what changed is its weight — it is now the
+only thing between the lane's model and a live connector, not insurance against a future one.
+

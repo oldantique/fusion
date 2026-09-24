@@ -8,6 +8,7 @@ import { etag } from "hono/etag";
 import { streamSSE } from "hono/streaming";
 import { config } from "../config.ts"; // loads .env itself, before anything reads process.env
 import { Store } from "../store/db.ts";
+import { Traces } from "../store/traces.ts";
 import { Jobs, ConflictError } from "./jobs.ts";
 import { ALL_PROVIDERS, modelInfo, type ProviderId } from "../types.ts";
 import { providers } from "../providers/index.ts";
@@ -26,7 +27,9 @@ fs.mkdirSync(config.sandboxDir, { recursive: true });
 
 const store = new Store();
 store.failStaleTurns();
-const jobs = new Jobs(store);
+const traces = new Traces(config.tracesDir, config.traceDays);
+traces.startPruning();
+const jobs = new Jobs(store, undefined, undefined, traces);
 
 const app = new Hono();
 
@@ -82,7 +85,9 @@ app.delete("/api/conversations/:id", (c) => {
   const id = c.req.param("id");
   const active = jobs.activeFor(id);
   if (active) return c.json({ error: "turn in progress — stop it first", turnId: active }, 409);
+  const turnIds = store.turnIds(id);
   store.deleteConversation(id);
+  traces.remove(turnIds);
   return c.json({ ok: true });
 });
 

@@ -173,6 +173,11 @@ export class Store {
     this.db.prepare("UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?").run(title.slice(0, 120), Date.now(), id);
   }
 
+  /** Ids of a conversation's turns, oldest first. */
+  turnIds(conversationId: string): string[] {
+    return (this.db.prepare("SELECT id FROM turns WHERE conversation_id = ? ORDER BY idx").all(conversationId) as any[]).map((r) => r.id);
+  }
+
   deleteConversation(id: string) {
     this.db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
   }

@@ -119,6 +119,12 @@ export interface Provider {
   streams: boolean;
   /** Whether the provider supports `jsonSchema` natively. */
   supportsJsonSchema: boolean;
+  /**
+   * Under `jsonSchema`, the reply text stays separate from the schema's object (claude: the CLI
+   * makes the schema a tool call beside the reply) rather than being the object (grok). The
+   * synthesizer then answers in the reply and puts only the analysis in the schema.
+   */
+  proseBesideSchema?: boolean;
   call(opts: CallOptions): AsyncGenerator<LaneEvent, void, void>;
 }
 

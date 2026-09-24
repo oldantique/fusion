@@ -401,6 +401,7 @@ export async function* codexTurn(daemon: CodexDaemon, opts: CallOptions): AsyncG
       wake = undefined;
       const msg = queue.shift();
       if (!msg) continue;
+      opts.onRecord?.(msg);
       switch (msg.method) {
         case "item/agentMessage/delta": {
           const d = String(msg.params.delta ?? "");

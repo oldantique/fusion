@@ -20,6 +20,7 @@ export interface CliProviderSpec {
   label: string;
   streams: boolean;
   supportsJsonSchema: boolean;
+  proseBesideSchema?: boolean;
   build(opts: CallOptions): Invocation;
   /**
    * The only host paths the CLI sees inside its bwrap jail (its own state dir, typically); the
@@ -39,6 +40,7 @@ export function cliProvider(spec: CliProviderSpec): Provider {
     label: spec.label,
     streams: spec.streams,
     supportsJsonSchema: spec.supportsJsonSchema,
+    proseBesideSchema: spec.proseBesideSchema,
     async *call(opts: CallOptions): AsyncGenerator<LaneEvent, void, void> {
       const inv = spec.build(opts);
       const parser = spec.parser(opts);
@@ -61,11 +63,14 @@ export function cliProvider(spec: CliProviderSpec): Provider {
       for await (const item of runLines({ cmd: inv.cmd, args: inv.args, stdin: inv.stdin, signal: opts.signal, jail: spec.jail === false ? undefined : spec.mounts })) {
         if (item.kind === "exit") {
           exit = item;
+          const { code, signal, timedOut, aborted, spawnFailed, stderr } = item;
+          // For traces: how the process ended and what it said on stderr, which no record carries.
+          opts.onRecord?.({ type: "fusion/exit", code, signal, timedOut, aborted, spawnFailed, stderr });
           break;
         }
         const obj = tryJson(item.line);
         if (obj === undefined && item.line.trim()) plain.push(item.line);
-        if (obj !== undefined) opts.onRecord?.(obj);
+        opts.onRecord?.(obj !== undefined ? obj : { type: "fusion/stdout", line: item.line });
         const events = obj !== undefined ? parser.feed(obj) : (spec.plainLine?.(item.line, parser) ?? []);
         for (const ev of events) {
           if (ev.type === "done") sawDone = true;

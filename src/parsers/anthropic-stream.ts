@@ -9,8 +9,11 @@
  *   {"type":"result","is_error":false,"result":"full text","structured_output":{...},"usage":{...},"total_cost_usd":n}
  *
  * The two CLIs differ in one place: under `--json-schema` claude streams the JSON document as
- * `input_json_delta` fragments while grok streams it as ordinary `text_delta`s. Both end with the
- * parsed object on `result.structured_output`.
+ * `input_json_delta` fragments (a tool call, beside any reply text) while grok streams it as
+ * ordinary `text_delta`s (the document *is* the reply). Both end with the parsed object on
+ * `result.structured_output`. Without a `streamJsonField`, `text_delta`s are the answer even under
+ * a schema — that is how claude's synthesizer runs (see `proseBesideSchema`), and its `done.text`
+ * is then the reply text, not `result.result` (which holds the JSON).
  */
 import type { LaneEvent, Usage } from "../types.ts";
 import { createJsonFieldStreamer } from "./json-field-stream.ts";

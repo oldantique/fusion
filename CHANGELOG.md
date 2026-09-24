@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- claude synthesizes in plain reply text and puts only the comparison in its structured output.
+  With Opus 5.5 it had started writing the answer twice, so the fused answer took longer, showed
+  nothing until the second copy began, and once was stored as just "see the full answer above".
+  The answer now streams from its first word at about half the output.
+- Every lane and synthesizer call leaves a raw trace under `data/traces/<turn-id>/` (the prompt,
+  everything the CLI printed, its stderr and the outcome), kept for `FUSION_TRACE_DAYS` (30 by
+  default) and deleted with its conversation.
 - The comparison under a fused answer is written in the question's language like the answer
   (Claude Opus 5.5 had started writing it in English), and a unique insight names its model even
   when the synthesizer writes "candidate C" instead of the bare letter.

@@ -62,6 +62,8 @@ export const config = {
   /** Empty directory that every CLI is spawned from, so no CLAUDE.md/AGENTS.md/skills leak in. */
   sandboxDir: path.join(ROOT, "data", "sandbox"),
   dbPath: path.join(ROOT, "data", "fusion.sqlite"),
+  /** Raw output of every CLI call, one directory per turn (`src/store/traces.ts`). */
+  tracesDir: path.join(ROOT, "data", "traces"),
   webDir: path.join(ROOT, "web"),
 
   /** Loopback by default; LAN/Tailscale access is an explicit opt-in in .env (no TLS here). */
@@ -102,6 +104,8 @@ export const config = {
   },
   /** Replayed history is trimmed from the oldest turn beyond this many characters. */
   historyCharBudget: int("HISTORY_CHAR_BUDGET", 60_000, 1_000),
+  /** Days a turn's raw traces are kept; 0 turns tracing off. */
+  traceDays: int("FUSION_TRACE_DAYS", 30, 0),
 
   models: {
     claude: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",

@@ -60,6 +60,26 @@ test("claude --json-schema: streams the answer field and returns structured outp
   assert.equal(streamed, done.structured.answer);
 });
 
+test("claude prose beside an analysis-only schema: the reply text is the answer, the tool the analysis", () => {
+  // How the synthesizer runs on claude (proseBesideSchema): no field is streamed from the schema.
+  const ev = run(createAnthropicStreamParser(), "claude-prose-schema.ndjson");
+  const streamed = ev.filter((e) => e.type === "delta").map((e: any) => e.text).join("");
+  const done = ev.at(-1) as any;
+  assert.equal(done.type, "done");
+  assert.ok(streamed.length > 0 && !streamed.includes('"analysis"'), "the prose streams, the tool's JSON does not");
+  assert.equal(done.text, streamed, "done.text is the reply text, not result.result (the JSON)");
+  assert.ok(done.structured.analysis.consensus.length > 0);
+  assert.ok(!("answer" in done.structured));
+});
+
+test("claude tool-only schema run (Opus 5 style) read as prose gives an empty answer, not the JSON", () => {
+  // The synthesizer then reports "empty" and the chain moves on, rather than showing a JSON document.
+  const done = run(createAnthropicStreamParser(), "claude-json-schema.ndjson").at(-1) as any;
+  assert.equal(done.type, "done");
+  assert.equal(done.text, "");
+  assert.ok(done.structured);
+});
+
 test("grok --json-schema: the JSON arrives as text deltas, the answer field still streams", () => {
   const p = createAnthropicStreamParser("answer");
   const ev = run(p, "grok-json-schema.ndjson");
