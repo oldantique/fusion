@@ -458,3 +458,20 @@ does the same today, so the change is on the account side, not in the CLI. The f
 there and still leaves the lane with no MCP server; what changed is its weight — it is now the
 only thing between the lane's model and a live connector, not insurance against a future one.
 
+
+## 2026-09-24 — Prompts have a byte ceiling; claude reads stdin
+
+Every CLI got its prompt as one command-line argument, and the kernel caps one argument at
+128 KiB. History was budgeted in characters only, and CJK text is three bytes a character, so a
+long Chinese conversation would have hit E2BIG before history trimming ever started — the
+synthesizer first, since its prompt adds four candidates to the history, then every argv lane.
+A second, quieter limit sits just above that for grok (found by the opencode sessions, confirmed
+under the lane's flags): past a threshold it moves the prompt into a file and has the model read
+it back with a tool, which the lane denies, so the model answers a prompt it never saw in full.
+claude reads the prompt from stdin now; kimi has neither stdin nor a prompt file, and grok's
+`--prompt-file` would need a mount and hits the same offload, so for them the prompt is kept
+under `PROMPT_MAX_BYTES` by trimming history in bytes as well as characters, the synthesizer's
+history getting only what its candidates leave. The same room applies to every lane, so all of
+them see the same conversation. A prompt that still does not fit — candidates alone past the
+ceiling — fails before spawning with a message that says so, and the chain moves on.
+

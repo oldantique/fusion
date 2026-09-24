@@ -113,24 +113,53 @@ export function escapeTagged(text: string): string {
 const TRIM_TO = 0.75;
 
 /**
- * Render prior turns as a replayable preamble, trimming the oldest turns beyond the char budget.
- * The newest turn is always kept but hard-truncated if it alone exceeds the budget, so one huge
- * answer cannot blow up every later prompt. Returns the text and how many turns were dropped.
+ * The most bytes a prompt may take. grok and kimi receive it as one command-line argument, which
+ * the kernel caps at 128 KiB (E2BIG past it), and grok moves a prompt past a threshold not far
+ * above this into a file its model has to read back with a tool — one the lane denies, so the
+ * model would answer without it. Bytes, not characters: CJK text is three bytes a character.
  */
-export function renderHistory(history: HistoryTurn[], budget = config.historyCharBudget): RenderedHistory {
+export const PROMPT_MAX_BYTES = 120_000;
+/** Room the fixed wording around history and candidates takes. */
+const TEMPLATE_BYTES = 1_000;
+
+export const utf8Bytes = (s: string): number => Buffer.byteLength(s, "utf8");
+
+/** Bytes left for history once these fixed parts (system prompt, question, candidates) are in. */
+export function historyRoom(...fixed: string[]): number {
+  return PROMPT_MAX_BYTES - TEMPLATE_BYTES - fixed.reduce((n, s) => n + utf8Bytes(s), 0);
+}
+
+/** Cuts `s` to at most `max` UTF-8 bytes without splitting a character. */
+function truncateBytes(s: string, max: number): string {
+  let t = s;
+  while (utf8Bytes(t) > max) t = t.slice(0, Math.floor((t.length * max) / utf8Bytes(t)));
+  return t;
+}
+
+/**
+ * Render prior turns as a replayable preamble, trimming the oldest turns beyond the char budget
+ * or beyond `maxBytes` (what the prompt leaves for history under `PROMPT_MAX_BYTES`). The newest
+ * turn is always kept but hard-truncated if it alone exceeds either, so one huge answer cannot
+ * blow up every later prompt. Returns the text and how many turns were dropped.
+ */
+export function renderHistory(history: HistoryTurn[], budget = config.historyCharBudget, maxBytes = Infinity): RenderedHistory {
   if (history.length === 0) return { text: "", omitted: 0 };
+  if (maxBytes <= 0) return { text: "", omitted: history.length };
   const blocks = history.map((t, i) => `### Q${i + 1}\n${escapeTagged(t.question.trim())}\n\n### Answer ${i + 1}\n${escapeTagged(t.answer.trim())}`);
   let start = 0;
   let total = blocks.reduce((n, b) => n + b.length, 0);
-  if (total > budget) {
-    const target = budget * TRIM_TO;
-    while (start < blocks.length - 1 && total > target) {
+  let bytes = blocks.reduce((n, b) => n + utf8Bytes(b), 0);
+  if (total > budget || bytes > maxBytes) {
+    while (start < blocks.length - 1 && (total > budget * TRIM_TO || bytes > maxBytes * TRIM_TO)) {
       total -= blocks[start]!.length;
+      bytes -= utf8Bytes(blocks[start]!);
       start++;
     }
   }
   const kept = blocks.slice(start);
-  if (kept.length === 1 && kept[0]!.length > budget) kept[0] = kept[0]!.slice(0, budget) + "\n…[truncated]";
+  if (kept.length === 1 && (kept[0]!.length > budget || utf8Bytes(kept[0]!) > maxBytes)) {
+    kept[0] = truncateBytes(kept[0]!.slice(0, budget), maxBytes) + "\n…[truncated]";
+  }
   const text = [
     "<conversation_so_far>",
     start > 0 ? `(earliest ${start} turn${start === 1 ? "" : "s"} omitted)` : "",

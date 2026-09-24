@@ -183,8 +183,20 @@ function signalTree(pid: number, sig: NodeJS.Signals) {
   }
 }
 
+/** The kernel's cap on one argument (MAX_ARG_STRLEN), terminating NUL included. */
+const MAX_ARG_BYTES = 128 * 1024;
+
 /** Yields stdout lines, then exactly one `exit` record. Never throws for non-zero exit. */
 export async function* runLines(opts: RunOptions): AsyncGenerator<ProcessLine | ProcessExit> {
+  // Past the cap the spawn fails with a bare "E2BIG"; say what is too long instead. Prompts are
+  // kept under it (`PROMPT_MAX_BYTES`), so this is for candidates that alone exceed it.
+  const tooLong = opts.args.find((a) => Buffer.byteLength(a, "utf8") + 1 > MAX_ARG_BYTES);
+  if (tooLong !== undefined) {
+    const kb = Math.ceil(Buffer.byteLength(tooLong, "utf8") / 1024);
+    const stderr = `prompt too long for ${opts.cmd}: a ${kb} KiB argument, over the 128 KiB one command-line argument can hold`;
+    yield { kind: "exit", code: -1, signal: null, stderr, timedOut: false, aborted: false, spawnFailed: true };
+    return;
+  }
   const timeoutMs = opts.timeoutMs ?? config.laneTimeoutMs;
   const cwd = opts.cwd ?? config.sandboxDir;
   // A fresh clone has no data/ yet, and a missing cwd fails the spawn with an ENOENT that names

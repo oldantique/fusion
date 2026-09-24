@@ -122,6 +122,7 @@ export function usageOf(result: any): Usage | undefined {
     inputTokens: u.input_tokens,
     outputTokens: u.output_tokens,
     cacheReadTokens: u.cache_read_input_tokens,
+    cacheWriteTokens: u.cache_creation_input_tokens,
     costUsd: result.total_cost_usd,
   };
 }

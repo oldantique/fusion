@@ -87,3 +87,10 @@ test("semaphore: a released permit is handed to the next waiter without a gap", 
   r2();
   assert.equal(sem.isFull, false);
 });
+
+test("an argument over the kernel's per-argument cap fails before spawning, naming the cause", async () => {
+  const { lines, exit } = await collect(runLines({ cmd: NODE, args: ["-e", "", "字".repeat(50_000)], cwd: process.cwd() }));
+  assert.deepEqual(lines, []);
+  assert.equal(exit.spawnFailed, true);
+  assert.match(exit.stderr, /prompt too long .*147 KiB argument, over the 128 KiB/);
+});

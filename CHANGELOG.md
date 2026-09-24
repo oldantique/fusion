@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Long conversations no longer break lanes: a prompt is passed as one command-line argument to
+  grok and kimi, which the kernel caps at 128 KiB — a Chinese conversation reached that long before
+  the history budget trimmed anything, and grok quietly loses a prompt near that size. History is
+  now trimmed in bytes to stay under the ceiling, claude reads its prompt from stdin, and a prompt
+  that still cannot fit fails with a message saying so instead of "spawn E2BIG".
 - claude synthesizes in plain reply text and puts only the comparison in its structured output.
   With Opus 5.5 it had started writing the answer twice, so the fused answer took longer, showed
   nothing until the second copy began, and once was stored as just "see the full answer above".

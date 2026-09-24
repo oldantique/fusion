@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { fuse, type FuseEvent } from "../src/synth/fuse.ts";
 import { runLane } from "../src/providers/lane.ts";
 import type { CallOptions, LaneEvent, Provider, ProviderId } from "../src/types.ts";
-import { ANALYSIS_SCHEMA, SYNTH_SCHEMA } from "../src/synth/prompts.ts";
+import { ANALYSIS_SCHEMA, PROMPT_MAX_BYTES, SYNTH_SCHEMA, utf8Bytes } from "../src/synth/prompts.ts";
 import type { Tracer } from "../src/store/traces.ts";
 
 type Script = (opts: CallOptions) => LaneEvent[];
@@ -271,4 +271,25 @@ test("stagger 0 fans out at once", async () => {
   await run(providers, ids, undefined, { staggerMs: 0 });
   assert.equal(starts.length, ids.length);
   assert.ok(starts.at(-1)!.at - t0 < 100, `no lane waited a stagger slot (${starts.at(-1)!.at - t0}ms)`);
+});
+
+test("a long CJK conversation keeps every lane and synthesizer prompt under the byte ceiling", async () => {
+  const sizes: number[] = [];
+  const measuring = (id: ProviderId): Provider => ({
+    ...stub(id, ok("答".repeat(8_000))),
+    async *call(opts) {
+      sizes.push(utf8Bytes(opts.system) + utf8Bytes(opts.prompt));
+      yield { type: "done", text: opts.prompt.includes("<candidate") ? "fused" : "答".repeat(8_000) };
+    },
+  });
+  // Ten turns of 10k-character answers: well inside the char budget, ~300 KB as UTF-8.
+  const history = Array.from({ length: 10 }, (_, i) => ({ question: `问题${i}`, answer: "答".repeat(10_000) }));
+  const out = await fuse(
+    { question: "新问题？", history, providerIds: ["claude", "grok", "kimi"], onEvent: () => {} },
+    { providers: { claude: measuring("claude"), grok: measuring("grok"), kimi: measuring("kimi") }, runLane, staggerMs: 0 },
+  );
+  assert.equal(out.answer, "fused");
+  assert.equal(sizes.length, 4, "three lanes and one synthesis");
+  for (const n of sizes) assert.ok(n <= PROMPT_MAX_BYTES, `a prompt of ${n} bytes`);
+  assert.ok(out.historyOmitted > 0);
 });

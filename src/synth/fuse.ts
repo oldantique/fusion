@@ -8,7 +8,7 @@ import { providers as realProviders } from "../providers/index.ts";
 import { runLane as realRunLane, sleep } from "../providers/lane.ts";
 import type { Analysis, HistoryTurn, LaneResult, Provider, ProviderId, SynthesisResult } from "../types.ts";
 import type { TraceOpener } from "../store/traces.ts";
-import { ANALYSIS_SCHEMA, PANEL_SYSTEM, SYNTH_SCHEMA, panelPrompt, renderHistory, synthPrompt, synthSystem } from "./prompts.ts";
+import { ANALYSIS_SCHEMA, PANEL_SYSTEM, SYNTH_SCHEMA, historyRoom, panelPrompt, renderHistory, synthPrompt, synthSystem, type SynthStyle } from "./prompts.ts";
 
 export type FuseEvent =
   | { type: "lane"; provider: ProviderId; status: "queued" | "running"; attempt: number; at: number }
@@ -76,7 +76,9 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
   const ids = input.providerIds.filter((id) => id in providers);
   if (ids.length === 0) throw new Error("no providers selected");
 
-  const rendered = renderHistory(history);
+  // History yields to the prompt-size ceiling (`PROMPT_MAX_BYTES`) before it is allowed to push
+  // a lane's prompt past it.
+  const rendered = renderHistory(history, config.historyCharBudget, historyRoom(PANEL_SYSTEM, question));
   onEvent({ type: "history", omitted: rendered.omitted });
 
   const prompt = panelPrompt(question, rendered);
@@ -117,7 +119,7 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
     return { ...base, synthesis: null, answer: done[0]!.answer, answerProvider: done[0]!.provider };
   }
 
-  const synthesis = await synthesize(question, rendered, lanes, signal, onEvent, deps, input.trace);
+  const synthesis = await synthesize(question, history, lanes, signal, onEvent, deps, input.trace);
   if (synthesis) return { ...base, synthesis, answer: synthesis.answer, answerProvider: null };
 
   // Every synthesizer failed (or the chain was aborted/deadlined): show the best raw answer rather
@@ -130,14 +132,18 @@ export async function fuse(input: FuseInput, deps: FuseDeps = { providers: realP
 
 async function synthesize(
   question: string,
-  rendered: ReturnType<typeof renderHistory>,
+  history: HistoryTurn[],
   lanes: LaneResult[],
   signal: AbortSignal | undefined,
   onEvent: (ev: FuseEvent) => void,
   deps: FuseDeps,
   trace?: TraceOpener,
 ): Promise<SynthesisResult | null> {
-  const { prompt, letterMap } = synthPrompt(question, rendered, lanes);
+  // The candidates are part of this prompt too, so history gets what they leave (possibly
+  // nothing); sized for the longest system prompt so any synthesizer in the chain fits.
+  const systems = (["prose", "json", "plain"] as SynthStyle[]).map(synthSystem).sort((a, b) => b.length - a.length);
+  const bare = synthPrompt(question, [], lanes).prompt;
+  const { prompt, letterMap } = synthPrompt(question, renderHistory(history, config.historyCharBudget, historyRoom(systems[0]!, bare)), lanes);
   const effort = deps.synthEffort ?? config.synthEffort;
   const timeoutMs = deps.synthTimeoutMs ?? config.laneTimeoutMs;
   // Every attempt gets a full lane timeout of its own, so a fallback started late is not handed

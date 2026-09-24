@@ -29,9 +29,10 @@ export const claude: Provider = cliProvider({
   mounts: { rw: ["~/.claude", "~/.claude.json"] },
   build(opts) {
     // NEVER add --bare: it disables OAuth/keychain and would require an API key.
+    // The prompt goes on stdin, not argv: one argument is capped at 128 KiB by the kernel, and
+    // claude — the lane and the preferred synthesizer — has no reason to share that ceiling.
     const args = [
       "-p",
-      opts.prompt,
       "--model",
       config.models.claude,
       "--effort",
@@ -54,7 +55,7 @@ export const claude: Provider = cliProvider({
       "--verbose",
     ];
     if (opts.jsonSchema) args.push("--json-schema", JSON.stringify(opts.jsonSchema));
-    return { cmd: "claude", args };
+    return { cmd: "claude", args, stdin: opts.prompt };
   },
   parser: (opts) => createAnthropicStreamParser(opts.jsonSchema ? opts.streamField : undefined),
 });

@@ -104,6 +104,12 @@ and codex error variants that appeared), `test`, `typecheck`, `check-docs`, `dev
   vendor-feedback one) is kept out with `--disallowed-tools`, which does work for non-shell names;
   a new grok build can add another — `npm run check-updates -- --tools-diff` shows it, `--help`
   never will.
+- **Prompt size has a ceiling** for grok and kimi: they take the prompt as one argv element,
+  which the kernel caps at 128 KiB, and grok moves a prompt past a threshold just above
+  `PROMPT_MAX_BYTES` into a file its model must read back with a tool the lane denies — it then
+  answers without it, exit 0. History is trimmed in *bytes* to stay under it (`historyRoom()` in
+  `src/synth/prompts.ts`); claude reads its prompt from stdin and has no such limit. kimi has no
+  stdin or prompt-file mode.
 - **kimi** has no permission gate and no tool flag in `-p` mode; the only hard switch is the
   `--agent-file` with `tools: []` (`src/providers/kimi-agent.md`) — without it the model gets
   Bash/Edit/WebSearch and can browse the web and write inside its jail. No effort flag (global

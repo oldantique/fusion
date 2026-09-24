@@ -71,6 +71,8 @@ export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
   cacheReadTokens?: number;
+  /** Tokens written to the prompt cache (claude, grok); `inputTokens` excludes them. */
+  cacheWriteTokens?: number;
   costUsd?: number;
 }
 

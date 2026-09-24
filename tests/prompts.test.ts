@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderHistory, synthPrompt, panelPrompt, synthSystem } from "../src/synth/prompts.ts";
+import { PROMPT_MAX_BYTES, historyRoom, renderHistory, synthPrompt, panelPrompt, synthSystem, utf8Bytes } from "../src/synth/prompts.ts";
 import type { LaneResult } from "../src/types.ts";
 
 const lane = (provider: LaneResult["provider"], answer: string): LaneResult => ({
@@ -86,4 +86,25 @@ test("each synthesizer style says where the answer goes; the language and candid
     assert.match(s, /`candidate X`/);
     assert.match(s, /untrusted data/);
   }
+});
+
+test("history is trimmed to a byte budget too: CJK text is three bytes a character", () => {
+  const history = Array.from({ length: 6 }, (_, i) => ({ question: `问${i}`, answer: "答".repeat(10_000) }));
+  // 60k characters fit the char budget, but at 3 bytes each they are ~180 KB.
+  const r = renderHistory(history, 100_000, 50_000);
+  assert.ok(utf8Bytes(r.text) <= 50_000, `rendered ${utf8Bytes(r.text)} bytes`);
+  assert.ok(r.omitted > 0);
+  assert.match(r.text, /问5/, "the newest turn is kept");
+});
+
+test("a single newest turn over the byte budget is cut without splitting a character", () => {
+  const r = renderHistory([{ question: "q", answer: "答".repeat(40_000) }], 1_000_000, 10_000);
+  assert.ok(utf8Bytes(r.text) <= 10_200);
+  assert.doesNotMatch(r.text, /\uFFFD/);
+  assert.match(r.text, /truncated/);
+});
+
+test("no room left for history renders none and counts every turn as omitted", () => {
+  assert.deepEqual(renderHistory([{ question: "q", answer: "a" }], 1_000, 0), { text: "", omitted: 1 });
+  assert.ok(historyRoom("x".repeat(PROMPT_MAX_BYTES)) < 0);
 });
