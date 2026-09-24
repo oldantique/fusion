@@ -43,8 +43,8 @@ paths by hand.
 
 ## Invariants (each has a slug for the pass log)
 
-- `code-owns-behaviour` — if `src/providers/`, `src/parsers/`, `src/synth/`, `src/server/jobs.ts`
-  or `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
+- `code-owns-behaviour` — if `src/providers/`, `src/parsers/`, `src/synth/`, `src/server/`,
+  `src/store/` or `src/config.ts` changed since the last sync (`git log`), re-read every CLAUDE.md gotcha, every
   RUNBOOK failure-mode row and the newest DESIGN entry that describes that behaviour; a sentence
   that now contradicts the code is deleted or corrected, not annotated. Gotchas stay one-line
   claim + pointer. An event type or status added to or retired from the `FuseEvent`/`JobEvent`
