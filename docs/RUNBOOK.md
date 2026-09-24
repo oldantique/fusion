@@ -59,6 +59,11 @@ the lane itself; codex: the error variants of its generated schema) against the
 `fixtures/help/*.tools.txt` baselines. Anything added must be named by the lane's blocks in
 `src/providers/index.ts`, or mapped in the codex error handler, before `--tools-diff --update`.
 
+After a grok upgrade, also send one prompt just under `PROMPT_MAX_BYTES` (`src/synth/prompts.ts`)
+through the lane, with a codeword at each end, and check the answer names both with no tool call
+in the stream. grok moves a prompt past its own threshold into a file the lane cannot read, and
+that threshold is the vendor's: if it drops below the ceiling, lower the ceiling to match.
+
 ## Failure modes
 
 | Symptom | Likely cause | Fix |
