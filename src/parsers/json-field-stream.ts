@@ -1,7 +1,8 @@
 /**
  * Incrementally extract the value of one top-level string field from a JSON document that
- * arrives in fragments (Anthropic `input_json_delta`). Lets the UI stream the synthesizer's
- * `answer` field while the surrounding JSON is still being generated.
+ * arrives in fragments (grok's schema output, which is its reply text; the fragments could as well
+ * be Anthropic `input_json_delta`s). Lets the UI stream a synthesizer's `answer` field while the
+ * surrounding JSON is still being generated — claude's synthesizer answers in prose instead.
  *
  * Handles JSON string escapes across fragment boundaries. Only the first occurrence of the
  * key at nesting depth 1 is tracked.

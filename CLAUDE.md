@@ -49,7 +49,7 @@ ask whether a hook can hold it.
 ## Layout (directory level — file headers describe individual files)
 
 - `src/providers/` spawn + parse + retry for each CLI · `src/parsers/` NDJSON parsers ·
-  `src/synth/` prompts and the fan-out/synthesize orchestration · `src/store/` SQLite ·
+  `src/synth/` prompts and the fan-out/synthesize orchestration · `src/store/` SQLite and call traces ·
   `src/server/` HTTP, SSE, auth, job registry · `web/` UI · `scripts/` ops and dev tools ·
   `tests/` · `fixtures/` · `deploy/` service unit · `docs/` · `data/` runtime state (gitignored).
 
